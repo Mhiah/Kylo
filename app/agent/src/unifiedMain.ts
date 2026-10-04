@@ -204,7 +204,7 @@ export function buildRunWork(): RunWork {
     if (structured) return JSON.stringify(await planBasket(structured));
     const insight = parseInsightRequest(prompt);
     model ??= buildModel(); // managed model with the auto-renew hook (delivery only)
-    if (insight) return deeperTake(model, insight.ticker, abortSignal);
+    if (insight) return deeperTake(model, insight.ticker, insight.facts, abortSignal);
 
     const result = await generateText({
       model,
@@ -235,12 +235,17 @@ export function buildRunWork(): RunWork {
   };
 }
 
-/** A JSON insight request (`{"action":"insight","ticker":"NVDA"}`), or null. */
-export function parseInsightRequest(prompt: string): { ticker: string } | null {
+/**
+ * A JSON insight request (`{"action":"insight","ticker":"NVDA"}`), or null.
+ * The Kylo web server may attach `facts` it already fetched from the Binance
+ * Web3 API, so the agent works even where it cannot reach Binance itself.
+ */
+export function parseInsightRequest(prompt: string): { ticker: string; facts?: Record<string, unknown> } | null {
   try {
-    const v = JSON.parse(prompt) as { action?: string; ticker?: string };
+    const v = JSON.parse(prompt) as { action?: string; ticker?: string; facts?: unknown };
     if (v?.action === "insight" && typeof v.ticker === "string" && /^[A-Za-z.]{1,10}$/.test(v.ticker)) {
-      return { ticker: v.ticker.toUpperCase() };
+      const facts = v.facts && typeof v.facts === "object" && !Array.isArray(v.facts) ? (v.facts as Record<string, unknown>) : undefined;
+      return { ticker: v.ticker.toUpperCase(), ...(facts ? { facts } : {}) };
     }
   } catch {
     // not JSON
@@ -255,17 +260,21 @@ export function parseInsightRequest(prompt: string): { ticker: string } | null {
 async function deeperTake(
   model: ReturnType<typeof buildModel>,
   ticker: string,
+  facts: Record<string, unknown> | undefined,
   abortSignal?: AbortSignal,
 ): Promise<string> {
-  const snapshot = await tokenSnapshot(ticker);
+  // Facts from the caller are capped so a request can't blow up the prompt.
+  const snapshot = facts && JSON.stringify(facts).length <= 20_000 ? { source: "Binance Web3 API via Kylo web app", ...facts } : await tokenSnapshot(ticker);
   const result = await generateText({
     model,
     system:
       "You are Kylo, explaining one tokenized US stock on BNB Chain to a " +
       "beginner. Use ONLY the JSON data you are given; if a number is missing, " +
-      "say so instead of guessing. On-chain token price is per token: divide by " +
-      "sharesMultiplier for the per-share price. tokenInfo.volume24h is US stock " +
-      "volume, not on-chain volume. Reply with ONLY a JSON object: " +
+      "say so instead of guessing. Prices may be per token or per share: use " +
+      "sharePrice when present, otherwise divide the token price by " +
+      "sharesMultiplier. Any rule-based `insight` in the data is a hint, not " +
+      "the answer. tokenInfo.volume24h, if present, is US stock volume, not " +
+      "on-chain volume. Reply with ONLY a JSON object: " +
       '{"summary": "2 plain sentences on what the company does and how the stock ' +
       'looks now", "reasonsToConsider": ["..."], "reasonsToHoldOff": ["..."], ' +
       '"tokenNotes": ["anything specific to holding the token rather than the ' +

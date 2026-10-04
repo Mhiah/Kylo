@@ -1,57 +1,58 @@
 # Kylo
 
-Every tokenized US stock on BNB Chain in one searchable list. Open any stock to see **Kylo's take** (what the company is, reasons to consider it, reasons to hold off, and what's different about holding the token), add the ones you like, and buy the whole basket in one tap. Stocks halted for earnings, splits or dividends are left out automatically.
+Every tokenized US stock on BNB Chain in one searchable list. Pick a theme (Binance's own sectors: AI chips, Magnificent 7, Energy, Buffett picks…), open any stock to see **Kylo's take** (what the company is, reasons to consider it, reasons to hold off, and what's different about holding the token), and buy the whole basket from your own wallet. Stocks halted for earnings, splits or dividends are left out automatically.
 
 Built for [BNB Hack: Tokenized Stocks Edition](https://www.bnbchain.org/en/hackathons/tokenized-stocks).
 
 ## How it works
 
 ```
-you ── "put $50 into AI stocks" ──▶ Claude + Agentic Wallet skill (client/)
-                                         │ 1. POST /x402  → 402 Payment Required
-                                         │ 2. baw x402-payment preview + sign (USDT on BSC)
-                                         │ 3. replay with PAYMENT-SIGNATURE
-                                         ▼
-                              Kylo agent on BNB Agent Studio (app/agent/)
-                              ERC-8004 identity, paid per request over x402
-                              plan = Binance Web3 RWA data, deterministic code:
-                                theme → tokenized tickers on BSC
-                                → per-asset market status (skip paused / earnings)
-                                → equal-weight legs, reference share price
-                                         │
-                                         ▼ basket plan (JSON)
-                              baw market-order quote → (confirm) → swap → poll to FINISHED
+browser (any wallet: MetaMask, Trust, Binance Wallet…)
+   │  browse, Kylo's take, plan basket
+   ▼
+Kylo web server (client/, hosted on Render in Singapore, holds only API keys)
+   │  official Binance Web3 API, signed with HMAC (client/web3api.mjs)
+   │    RWA Data     token list + sector tabs, underlying profile & market data
+   │    General Data candles, on-chain trading info, top liquidity pools
+   │    Trading      quote → build order (RFQ for Ondo stocks) → submit → status
+   │    Transaction  simulate the USDT approval before the user signs it
+   ▼
+plan = deterministic code: theme → Binance sector tab → skip paused/earnings
+       → equal-weight legs to the cent
+   │
+   ▼  per stock: user signs one EIP-712 order in their wallet
+      (plus one USDT approval for the whole basket, if needed)
+Binance RFQ vendor settles on BNB Chain → receipt with BscScan links
+
+Kylo agent on BNB Agent Studio (app/agent/): ERC-8004 identity, writes the
+plain-English "written take" with its LLM from facts the server passes in.
 ```
 
-- **Agent Studio:** the seller agent in `app/agent/`, scaffolded with `bag init`. The basket logic lives in `src/stocks.ts`. JSON requests skip the LLM entirely, and free-text requests go through the LLM, which may only call `plan_basket`.
-- **One-tap app:** `client/server.mjs` + `client/web/index.html`.
-  - Browse and search every Ondo tokenized stock on BSC (by company, ticker, industry or theme tag), sort by size or 24h move, and filter with theme presets (AI, semis, big tech, energy, dividends, crypto, EV).
+- **Web app:** `client/server.mjs` + `client/web/index.html`.
+  - Browse and search every Ondo tokenized stock and ETF on BSC, sort by size or 24h move, and filter by Binance's sector tabs.
   - **Kylo's take** per stock (free): a 90-day chart, 52-week range, P/E, dividend, company size, on-chain liquidity and holders, then plain-language "reasons to consider", "reasons to hold off" and token notes from visible rules in `client/data.mjs`, plus a quick read ("Looks steady", "Mixed picture", "Handle with care").
-  - **Deeper take** (paid over x402 from Agentic Wallet): the Kylo agent's LLM explains the same live snapshot in plain English, with no price targets and no buy/sell instructions.
-  - **Basket tray:** add stocks one by one or a whole theme, pick an amount, **Plan basket** (pays Kylo, shows legs, left-out stocks with reasons, and quotes), then **Buy basket**. The receipt shows each leg's final order status and a BscScan link.
-- **Agentic Wallet / Wallet Skills:** `client/lib.mjs` (shared by the app and `client/kylo-buy.mjs`) pays the agent with `baw x402-payment` and buys each leg with `baw market-order`. `client/skills/kylo-basket/SKILL.md` lets Claude drive it from a sentence.
-- **Binance Web3 API:** public RWA endpoints (token list, market status, per-asset status, dynamic price and multiplier), plus Agentic Wallet quotes and swaps.
+  - **Written take:** the Kylo agent's LLM explains the same live data in plain English, with no price targets and no buy/sell instructions. Shown when `KYLO_AGENT_URL` is set.
+  - **Basket tray:** add stocks one by one or a whole theme, pick an amount, **Plan basket** (legs, left-out stocks with reasons, live quotes, your USDT balance), then **Buy basket**. The receipt shows each order's final settlement status and a BscScan link.
+- **Never holds keys:** the server only has Binance Web3 API keys. Every purchase is signed in the user's own wallet, and the user can reject any order.
+- **Agent Studio:** the seller agent in `app/agent/`, scaffolded with `bag init`. JSON requests skip the LLM for planning (`src/stocks.ts`), and the insight route accepts facts from the web server so the agent works wherever it is hosted.
 
 ## Run it
 
 ```bash
-pnpm install
-pnpm --dir app/agent test              # planner unit tests
+# web app (needs a Binance Web3 API key from https://web3.binance.com/en/dev-portal)
+KYLO_W3_API_KEY=… KYLO_W3_API_SECRET=… node client/server.mjs   # open http://localhost:4402
+node --test client/test/*.test.mjs                               # client unit tests
 
 # agent (see AGENTS.md / `bag doctor` for wallet + LLM setup)
+pnpm install
+pnpm --dir app/agent test
 cd app/agent && bag wallet new --generate-password && cd ../..
 bag llm activate
-bag dev                                # local; set payments.seller.price_usd = "0" for free local testing
-
-# buyer
-npm i -g @binance/agentic-wallet && baw auth signin
-
-# one-tap web app (runs on your machine next to the signed-in baw; binds to localhost only)
-KYLO_AGENT_URL=http://localhost:8080 node client/server.mjs   # open http://localhost:4402
-
-# or the CLI
-node client/kylo-buy.mjs --agent http://localhost:8080 --theme ai --usd 20             # quotes only
-node client/kylo-buy.mjs --agent http://localhost:8080 --theme ai --usd 20 --execute   # buys
+bag dev        # local; then set KYLO_AGENT_URL=http://localhost:8080 for the web app
 ```
 
-Every API and CLI call is timed into `dx/calls.jsonl` as raw material for the Developer Experience Report.
+### Deploy the web app on Render (free)
+
+`render.yaml` is a Render Blueprint: free plan, Singapore region (the Binance Web3 API isn't reachable from every country). In Render choose **New → Blueprint**, pick this repo and branch, and paste `KYLO_W3_API_KEY` and `KYLO_W3_API_SECRET` when asked. Leave `KYLO_AGENT_URL` empty until the agent is deployed.
+
+Every Binance Web3 API call is timed into `dx/calls.jsonl` (never with keys or signatures) as raw material for the Developer Experience Report.

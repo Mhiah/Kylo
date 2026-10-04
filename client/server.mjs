@@ -1,67 +1,109 @@
 #!/usr/bin/env node
 /**
- * Kylo one-tap web app. Runs on YOUR machine next to the signed-in `baw`
- * CLI, serves the page in client/web/, and turns taps into wallet actions:
+ * Kylo web app server. Serves the page in client/web/ and talks to the
+ * official Binance Web3 API with the keys in its environment. It runs on a
+ * cloud host (Render, Singapore region) so users anywhere can reach it, and
+ * it never holds a private key: buying is signed in the user's own browser
+ * wallet.
  *
- *   GET  /api/wallet                  → Agentic Wallet status + address
- *   GET  /api/tokens                  → every tokenized stock on BSC (free, public data)
- *   GET  /api/token?ticker=NVDA       → detail + rule-based insight box (free)
- *   POST /api/take  {ticker}          → Kylo's paid deeper take (x402)
- *   POST /api/plan  {tickers|theme,usd} → pays Kylo over x402, returns plan + quotes
- *   POST /api/buy   {planId}          → buys every leg of that plan, returns receipt
+ *   GET  /api/config                    → chain, agent on/off, data source
+ *   GET  /api/tokens                    → every tokenized stock on BSC + Binance sectors
+ *   GET  /api/token?ticker=NVDA         → detail + Kylo's rule-based take
+ *   POST /api/take   {ticker}           → Kylo agent's written take (LLM)
+ *   POST /api/plan   {tickers|theme, usd, wallet?} → plan + live quotes
+ *   POST /api/leg    {planId, index}    → one order to sign (+ approval if needed)
+ *   POST /api/submit {planId, index, signature} → hand a signed order to Binance
+ *   GET  /api/order?id=…                → order settlement status
  *
- *   KYLO_AGENT_URL=https://<agent> node client/server.mjs   # then open http://localhost:4402
- *
- * Binds to 127.0.0.1 only: anything that can reach this port can spend from
- * the wallet (within its Binance limits), so it must never be exposed.
+ *   KYLO_W3_API_KEY=… KYLO_W3_API_SECRET=… node client/server.mjs   # http://localhost:4402
  */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { marketStatus, tokenDetail, tokenList } from "./data.mjs";
-import { baw, buyLegs, getPlan, getTake, quoteLegs } from "./lib.mjs";
+import { SECTORS, marketStatus, tokenDetail, tokenList } from "./data.mjs";
+import { isAddress, orderStatus, planBasket, prepareLeg, quoteLegs, submitLeg, usdtBalance, formatUnits } from "./trade.mjs";
+import { hasKeys } from "./web3api.mjs";
 
 const PORT = Number(process.env.PORT ?? 4402);
-const AGENT = process.env.KYLO_AGENT_URL ?? "http://localhost:8080";
+// Render sets RENDER=true; a public host must listen on all interfaces.
+const HOST = process.env.HOST ?? (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
+const AGENT = process.env.KYLO_AGENT_URL ?? "";
 const WEB = join(fileURLToPath(new URL(".", import.meta.url)), "web");
-const PLAN_TTL_MS = 5 * 60 * 1000;
-const plans = new Map(); // planId → { plan, slippage, at, bought }
+const PLAN_TTL_MS = 10 * 60 * 1000;
+const plans = new Map(); // planId → { plan, wallet, at, legs: [{ requestId, prepared, orderId }] }
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png" };
+
+function planEntry(planId, index) {
+  const entry = plans.get(planId);
+  if (!entry) throw httpError(404, "plan not found; plan again");
+  if (Date.now() - entry.at > PLAN_TTL_MS) throw httpError(410, "plan expired; prices may have changed, plan again");
+  const leg = entry.plan.legs[index];
+  if (!leg) throw httpError(400, "no such stock in this plan");
+  return { entry, leg, state: entry.legs[index] };
+}
 
 const routes = {
-  "GET /api/wallet": async () => {
-    const status = await baw("wallet", "status");
-    const address = await baw("wallet", "address").catch(() => null);
-    return { status, address, agent: AGENT };
-  },
+  "GET /api/config": async () => ({
+    chainId: 56, chainHex: "0x38", dataSource: "Binance Web3 API", keys: hasKeys(), agent: Boolean(AGENT), sectors: SECTORS.map(({ id, label }) => ({ id, label })),
+  }),
   "GET /api/tokens": async () => ({ tokens: await tokenList(), market: await marketStatus().catch(() => null) }),
-  "GET /api/token": async (_body, url) => tokenDetail(url.searchParams.get("ticker") ?? ""),
+  "GET /api/token": async (_b, url) => tokenDetail(url.searchParams.get("ticker") ?? ""),
   "POST /api/take": async (body) => {
+    if (!AGENT) throw httpError(503, "Kylo's agent isn't switched on yet");
     if (!body.ticker) throw httpError(400, "ticker is required");
-    return getTake(AGENT, body.ticker);
+    const facts = await tokenDetail(body.ticker);
+    delete facts.closes90d; // keep the prompt small; the rules already summarise the trend
+    return { take: await askAgent({ action: "insight", ticker: facts.ticker, facts }) };
   },
   "POST /api/plan": async (body) => {
-    const { theme, tickers, usd, maxLegs, allowEarnings, slippage } = body;
-    if ((!theme && !tickers?.length) || !(Number(usd) > 0)) throw httpError(400, "pick at least one stock and a positive amount");
-    const { plan, payment } = await getPlan(AGENT, { theme, tickers, usd, maxLegs, allowEarnings });
-    const quotes = plan.legs.length ? await quoteLegs(plan, slippage) : [];
+    const { theme, tickers, usd, maxLegs, allowEarnings } = body;
+    const wallet = isAddress(body.wallet) ? body.wallet : null;
+    const plan = await planBasket({ theme, tickers, usd, maxLegs, allowEarnings });
+    const quotes = wallet && plan.legs.length ? await quoteLegs(plan, wallet) : [];
+    const balance = wallet ? await usdtBalance(wallet).then((b) => formatUnits(b, 18, 2)).catch(() => null) : null;
     const planId = randomUUID();
-    plans.set(planId, { plan, slippage, at: Date.now(), bought: false });
-    return { planId, plan, payment, quotes, expiresInSec: PLAN_TTL_MS / 1000 };
+    plans.set(planId, { plan, wallet, at: Date.now(), legs: plan.legs.map(() => ({ requestId: randomUUID(), prepared: null, orderId: null })) });
+    for (const [id, e] of plans) if (Date.now() - e.at > PLAN_TTL_MS) plans.delete(id);
+    return { planId, plan, quotes, wallet, usdtBalance: balance, expiresInSec: PLAN_TTL_MS / 1000 };
   },
-  "POST /api/buy": async (body) => {
-    const entry = plans.get(body.planId);
-    if (!entry) throw httpError(404, "plan not found; plan again");
-    if (entry.bought) throw httpError(409, "this plan was already bought");
-    if (Date.now() - entry.at > PLAN_TTL_MS) throw httpError(410, "plan expired; prices and halts may have changed, plan again");
-    entry.bought = true; // one tap = one buy, even if the button is double-clicked
-    const results = await buyLegs(entry.plan, entry.slippage);
-    return { results };
+  "POST /api/leg": async (body) => {
+    const { entry, leg, state } = planEntry(body.planId, Number(body.index));
+    if (!entry.wallet) throw httpError(400, "connect a wallet and plan again");
+    if (state.orderId) throw httpError(409, "this stock was already ordered");
+    const index = Number(body.index);
+    const restUsd = entry.plan.legs.slice(index).reduce((sum, l) => sum + l.usd, 0);
+    state.prepared = await prepareLeg(leg, entry.wallet, body.slippagePercent, restUsd);
+    return state.prepared;
   },
+  "POST /api/submit": async (body) => {
+    const { state } = planEntry(body.planId, Number(body.index));
+    if (!state.prepared?.rfq) throw httpError(400, "prepare this order first");
+    if (state.orderId) return { orderId: state.orderId, status: "ALREADY_SUBMITTED" };
+    if (!/^0x[0-9a-fA-F]{130}$/.test(body.signature ?? "")) throw httpError(400, "bad signature");
+    const r = await submitLeg({ requestId: state.requestId, signature: body.signature, ...state.prepared.rfq });
+    state.orderId = r?.orderId ?? null;
+    return r;
+  },
+  "GET /api/order": async (_b, url) => orderStatus(url.searchParams.get("id") ?? ""),
 };
+
+async function askAgent(promptObj) {
+  const res = await fetch(AGENT.replace(/\/$/, "") + "/x402", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt: JSON.stringify(promptObj) }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const text = await res.text();
+  if (!res.ok) throw httpError(502, `Kylo's agent answered ${res.status}`);
+  let out = text;
+  try { const j = JSON.parse(text); out = j.result ?? j.output ?? j.text ?? j; } catch { /* plain text */ }
+  if (typeof out === "string") { try { return JSON.parse(out); } catch { return { summary: out }; } }
+  return out;
+}
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -71,6 +113,7 @@ createServer(async (req, res) => {
       const body = req.method === "POST" ? JSON.parse((await readBody(req)) || "{}") : {};
       return send(res, 200, JSON.stringify(await route(body, url)), "application/json");
     }
+    if (url.pathname === "/healthz") return send(res, 200, "ok");
     if (req.method !== "GET") return send(res, 405, "method not allowed");
     const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     if (file.includes("..")) return send(res, 400, "bad path");
@@ -80,8 +123,8 @@ createServer(async (req, res) => {
   } catch (e) {
     return send(res, e.status ?? 500, JSON.stringify({ error: String(e.message ?? e).slice(0, 500) }), "application/json");
   }
-}).listen(PORT, "127.0.0.1", () => {
-  console.log(`Kylo one-tap app on http://localhost:${PORT} (agent: ${AGENT})`);
+}).listen(PORT, HOST, () => {
+  console.log(`Kylo on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT} (Web3 API keys ${hasKeys() ? "set" : "MISSING"}, agent ${AGENT || "off"})`);
 });
 
 function httpError(status, message) {
@@ -89,7 +132,7 @@ function httpError(status, message) {
 }
 
 function send(res, status, body, type = "text/plain") {
-  res.writeHead(status, { "Content-Type": type });
+  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" });
   res.end(body);
 }
 

@@ -1,0 +1,21 @@
+# Render Blueprint for the Kylo web app (free plan, Singapore region so the
+# server can reach the Binance Web3 API). The API keys are entered privately
+# in Render when the Blueprint is created; they never go in this repo.
+services:
+  - type: web
+    name: kylo
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: echo "no build step; the web app has no dependencies"
+    startCommand: node client/server.mjs
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: KYLO_W3_API_KEY
+        sync: false
+      - key: KYLO_W3_API_SECRET
+        sync: false
+      - key: KYLO_AGENT_URL
+        sync: false

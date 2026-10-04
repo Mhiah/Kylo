@@ -131,13 +131,16 @@
   .skeleton { height: 64px; border-radius: var(--radius); background: linear-gradient(90deg, var(--card) 0%, var(--card2) 50%, var(--card) 100%); background-size: 200% 100%; animation: sh 1.2s infinite; border: 1px solid var(--line); }
   @keyframes sh { to { background-position: -200% 0; } }
   .disclaimer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+  .btnpill { border: 0; cursor: pointer; font: inherit; font-size: 12px; }
+  .btnpill.good { background: var(--good-bg); color: var(--good); }
+  .src { font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Kylo<span>.</span></h1>
-    <div class="pills"><span class="pill" id="market">Market…</span><span class="pill" id="wallet">Wallet…</span></div>
+    <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
   <p class="lead">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's take, add the ones you like, and buy them all in one tap.</p>
 
@@ -159,7 +162,7 @@
   <div class="list" id="list">
     <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
   </div>
-  <p class="disclaimer">Kylo's take is built from live public data and simple, visible rules. It isn't investment advice, and every decision is yours. Purchases stay inside the daily limit and token list you set for Agentic Wallet in the Binance app.</p>
+  <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's take is built from that live data and simple, visible rules. It isn't investment advice, and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet, and you can say no to any of them.</p>
 </main>
 
 <div class="tray" id="tray"><div class="tray-in">
@@ -177,25 +180,18 @@
 <div class="sheet" id="sheet"><div class="sheet-in" id="sheetin"></div></div>
 
 <script>
-const THEMES = [
-  { id: "all", label: "All" },
-  { id: "ai", label: "AI", tickers: ["NVDA","MSFT","GOOGL","META","AMD","PLTR","AVGO"], tag: /\bAI\b|artificial intelligence/i },
-  { id: "semis", label: "Semiconductors", tickers: ["NVDA","AMD","AVGO","TSM","INTC","QCOM","MU","ARM"], tag: /semiconductor|chip/i },
-  { id: "bigtech", label: "Big Tech", tickers: ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA"] },
-  { id: "energy", label: "Energy", tickers: ["XOM","CVX","COP","OXY","SLB","NEE"], tag: /oil|energy|gas/i },
-  { id: "dividends", label: "Dividend payers", tickers: ["KO","PEP","JNJ","PG","XOM","CVX","ABBV"] },
-  { id: "crypto", label: "Crypto stocks", tickers: ["COIN","MSTR","HOOD","MARA","RIOT"], tag: /crypto|bitcoin|blockchain/i },
-  { id: "ev", label: "EV & autos", tickers: ["TSLA","RIVN","NIO","GM","F"], tag: /electric vehicle|\bEV\b/i },
-];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (n, d = 2) => n == null ? "–" : "$" + n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 const big = (n) => n == null ? "–" : n >= 1e12 ? `$${(n/1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n/1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n/1e3).toFixed(0)}K` : `$${n.toFixed(0)}`;
 const chg = (n) => n == null ? "" : `<span class="${n >= 0 ? "up" : "down"}">${n >= 0 ? "▲" : "▼"} ${Math.abs(n).toFixed(2)}%</span>`;
+const short = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-let tokens = [], theme = "all", usd = 25, open = null, plan = null;
+let tokens = [], theme = "all", usd = 25, open = null, plan = null, config = { sectors: [], agent: false, chainHex: "0x38" }, wallet = null;
 const basket = new Set();
-const details = new Map(); // ticker → detail (or promise)
+const details = new Map(); // ticker → detail (or "loading")
+const themes = () => [{ id: "all", label: "All" }, ...config.sectors];
 
 async function api(path, body) {
   const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
@@ -204,15 +200,32 @@ async function api(path, body) {
   return data;
 }
 
-// ── header ────────────────────────────────────────────────────────────────
-api("/api/wallet").then((w) => {
-  const a = typeof w.address === "string" ? w.address : (w.address?.address ?? w.address?.[0]?.address ?? "");
-  $("#wallet").textContent = a ? `Wallet ${a.slice(0, 6)}…${a.slice(-4)}` : "Wallet connected";
-  $("#wallet").className = "pill good";
-}).catch(() => { $("#wallet").textContent = "Wallet not signed in"; $("#wallet").className = "pill bad"; $("#wallet").title = "Run: baw auth signin"; });
+// ── wallet (any browser wallet: MetaMask, Trust, Binance Web3 Wallet…) ─────
+const eth = () => window.ethereum;
+function showWallet() {
+  const b = $("#wallet");
+  b.textContent = wallet ? `Wallet ${short(wallet)}` : "Connect wallet";
+  b.className = `pill btnpill ${wallet ? "good" : ""}`;
+}
+async function connect() {
+  if (!eth()) throw new Error("No wallet found in this browser. Open Kylo inside your wallet app's browser (MetaMask, Trust Wallet or Binance Wallet), or install a wallet extension.");
+  const [a] = await eth().request({ method: "eth_requestAccounts" });
+  try {
+    await eth().request({ method: "wallet_switchEthereumChain", params: [{ chainId: config.chainHex }] });
+  } catch (e) {
+    if (e.code === 4902) await eth().request({ method: "wallet_addEthereumChain", params: [{ chainId: "0x38", chainName: "BNB Smart Chain", nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 }, rpcUrls: ["https://bsc-dataseed.bnbchain.org"], blockExplorerUrls: ["https://bscscan.com"] }] });
+    else throw e;
+  }
+  wallet = a; showWallet(); return a;
+}
+$("#wallet").addEventListener("click", () => connect().catch((e) => alert(e.message)));
+eth()?.request({ method: "eth_accounts" }).then(([a]) => { if (a) { wallet = a; showWallet(); } }).catch(() => {});
+eth()?.on?.("accountsChanged", ([a]) => { wallet = a ?? null; showWallet(); });
 
 // ── themes & search ───────────────────────────────────────────────────────
-$("#themes").innerHTML = THEMES.map((t) => `<button class="chip" data-id="${t.id}" aria-pressed="${t.id === theme}">${t.label}</button>`).join("");
+function renderThemes() {
+  $("#themes").innerHTML = themes().map((t) => `<button class="chip" data-id="${t.id}" aria-pressed="${t.id === theme}">${esc(t.label)}</button>`).join("");
+}
 $("#themes").addEventListener("click", (e) => {
   const b = e.target.closest(".chip"); if (!b) return;
   theme = b.dataset.id;
@@ -223,16 +236,12 @@ $("#q").addEventListener("input", render);
 $("#sort").addEventListener("change", render);
 $("#addall").addEventListener("click", () => { visible().forEach((t) => t.status.tone !== "bad" && basket.add(t.ticker)); render(); renderTray(); });
 
-function inTheme(t) {
-  const th = THEMES.find((x) => x.id === theme);
-  if (!th || th.id === "all") return true;
-  return th.tickers?.includes(t.ticker) || (th.tag && t.tags.some((g) => th.tag.test(g)));
-}
+const inTheme = (t) => theme === "all" || t.sectors.includes(theme);
 function visible() {
   const q = $("#q").value.trim().toLowerCase();
+  const sectorLabels = (t) => t.sectors.map((id) => config.sectors.find((s) => s.id === id)?.label ?? "").join(" ").toLowerCase();
   const list = tokens.filter((t) => inTheme(t) && (!q ||
-    t.ticker.toLowerCase().includes(q) || t.name.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q) ||
-    (t.industry ?? "").toLowerCase().includes(q) || t.tags.some((g) => g.toLowerCase().includes(q))));
+    t.ticker.toLowerCase().includes(q) || t.name.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q) || sectorLabels(t).includes(q)));
   const s = $("#sort").value;
   const by = { cap: (a, b) => (b.stockMarketCap ?? 0) - (a.stockMarketCap ?? 0), up: (a, b) => (b.change24hPct ?? -1e9) - (a.change24hPct ?? -1e9),
                down: (a, b) => (a.change24hPct ?? 1e9) - (b.change24hPct ?? 1e9), az: (a, b) => a.ticker.localeCompare(b.ticker) }[s];
@@ -246,9 +255,9 @@ function logo(t) {
 function render() {
   const list = visible();
   $("#count").textContent = tokens.length ? `${list.length} of ${tokens.length} stocks` : "";
-  const th = THEMES.find((x) => x.id === theme);
+  const th = themes().find((x) => x.id === theme);
   $("#themebar").classList.toggle("on", theme !== "all" && list.length > 0);
-  $("#themetext").textContent = th && theme !== "all" ? `${th.label}: ${list.length} stocks` : "";
+  $("#themetext").innerHTML = th && theme !== "all" ? `${esc(th.label)}: ${list.length} stocks <span class="src">· picked by Binance</span>` : "";
   if (!tokens.length) return;
   if (!list.length) { $("#list").innerHTML = `<p class="empty">No stock matches “${esc($("#q").value)}”. Try a company name or ticker.</p>`; return; }
   $("#list").innerHTML = list.map((t) => `
@@ -261,7 +270,8 @@ function render() {
       </div>
       <div class="row-sub" data-act="toggle">
         <span class="pill ${t.status.tone}">${esc(t.status.label)}</span>
-        ${t.industry ? `<span class="pill">${esc(t.industry)}</span>` : ""}
+        ${t.assetType === "ETF" ? `<span class="pill">ETF</span>` : ""}
+        ${t.sectors.slice(0, 2).map((id) => `<span class="pill">${esc(config.sectors.find((s) => s.id === id)?.label ?? id)}</span>`).join("")}
         <span class="more">${open === t.ticker ? "Hide Kylo's take ▲" : "Kylo's take ▼"}</span>
       </div>
       ${open === t.ticker ? `<div class="insight" id="ins">${insightHtml(t.ticker)}</div>` : ""}
@@ -270,11 +280,11 @@ function render() {
 $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const tk = row.dataset.t;
+  if (e.target.closest("[data-deeper]")) return askDeeper(tk);
+  if (e.target.closest("[data-about]")) return e.target.closest("[data-about]").classList.toggle("open");
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "add") { basket.has(tk) ? basket.delete(tk) : basket.add(tk); render(); renderTray(); return; }
-  if (act === "toggle") { open = open === tk ? null : tk; render(); if (open) loadDetail(tk); return; }
-  if (e.target.closest("[data-deeper]")) return askDeeper(tk);
-  if (e.target.closest("[data-about]")) e.target.closest("[data-about]").classList.toggle("open");
+  if (act === "toggle") { open = open === tk ? null : tk; render(); if (open) loadDetail(tk); }
 });
 
 async function loadDetail(tk) {
@@ -320,18 +330,18 @@ function insightHtml(tk) {
       <div class="no"><h4>Reasons to hold off</h4>${li(i.holdOff)}</div>
     </div>
     ${i.token.length ? `<div class="cols tok" style="margin-top:10px"><div><h4>About holding the token</h4>${li(i.token)}</div></div>` : ""}
-    <div class="deeper">
-      ${deeper?.take ? deeperHtml(deeper) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written take? It reads the same live data and explains it in plain English.</p>`}
-      ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a deeper take · paid from your wallet"}</button>`}
-    </div>
+    ${config.agent ? `<div class="deeper">
+      ${deeper?.take ? deeperHtml(deeper.take) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written take? Kylo's AI agent reads the same live data and explains it in plain English.</p>`}
+      ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a written take"}</button>`}
+    </div>` : ""}
     <div class="foot">
       <span>${esc(d.symbol)} · <a href="https://bscscan.com/token/${esc(d.contractAddress)}" target="_blank" rel="noopener">contract ↗</a></span>
-      ${d.attestation ? `<a href="${esc(d.attestation)}" target="_blank" rel="noopener">Monthly attestation report ↗</a>` : ""}
+      ${(d.protections ?? []).map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("")}
       ${d.ceo ? `<span>CEO ${esc(d.ceo)}</span>` : ""}
     </div>`;
 }
-function deeperHtml({ take, payment }) {
-  return `<p><b>Kylo's take</b>${payment ? ` <span class="empty">· paid ${esc(payment.amount)} ${esc(payment.token)}</span>` : ""}</p>
+function deeperHtml(take) {
+  return `<p><b>Kylo's take</b></p>
     ${take.summary ? `<p>${esc(take.summary)}</p>` : ""}
     <div class="cols"><div class="yes">${li(take.reasonsToConsider ?? [])}</div><div class="no">${li(take.reasonsToHoldOff ?? [])}</div></div>
     ${take.tokenNotes?.length ? `<div class="tok" style="margin-top:6px">${li(take.tokenNotes)}</div>` : ""}
@@ -359,64 +369,124 @@ $("#amt").addEventListener("click", (e) => {
 });
 $("#custom").addEventListener("input", (e) => { usd = Number(e.target.value) || 0; document.querySelectorAll("#amt .chip").forEach((x) => x.setAttribute("aria-pressed", "false")); renderTray(); });
 
-// ── plan → buy → receipt ──────────────────────────────────────────────────
+// ── plan → sign each order → receipt ─────────────────────────────────────
 const sheet = (html) => { $("#sheetin").innerHTML = html; $("#sheet").classList.add("on"); };
 $("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet" || e.target.closest("[data-close]")) $("#sheet").classList.remove("on"); });
 
 $("#plan").addEventListener("click", async () => {
   if (!(usd > 0)) return alert("Enter an amount first.");
-  const btn = $("#plan"); btn.disabled = true; btn.textContent = "Paying Kylo and planning…";
+  const btn = $("#plan"); btn.disabled = true; btn.textContent = "Planning…";
   try {
-    plan = await api("/api/plan", { tickers: [...basket], usd, allowEarnings: $("#earnings").checked });
+    plan = await api("/api/plan", { tickers: [...basket], usd, allowEarnings: $("#earnings").checked, wallet });
     renderPlan(plan);
   } catch (e) { sheet(`<h3>Couldn't plan the basket</h3><p class="err">${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Close</button></div>`); }
   finally { btn.disabled = false; renderTray(); }
 });
 
-function renderPlan({ plan: p, payment, quotes }) {
+function renderPlan({ plan: p, quotes, wallet: w, usdtBalance }) {
   const q = Object.fromEntries((quotes || []).map((x) => [x.ticker, x]));
-  const canBuy = p.legs.length > 0 && (quotes || []).every((x) => x.ok);
+  const quoted = w && p.legs.length > 0 && (quotes || []).every((x) => x.ok);
+  const short$ = usdtBalance != null && Number(usdtBalance) < p.totalUsd;
   sheet(`
-    <h3>Your basket · ${money(p.totalUsd)} across ${p.legs.length} stocks</h3>
-    <p class="sub">${payment ? `Kylo fee paid: ${esc(payment.amount)} ${esc(payment.token)}` : "Kylo fee: free (local mode)"} · BNB Chain · plan valid 5 minutes</p>
+    <h3>${esc(p.label)} · ${money(p.totalUsd)} across ${p.legs.length} stocks</h3>
+    <p class="sub">Paid in USDT on BNB Chain · equal amounts · ${w ? `wallet ${esc(short(w))}${usdtBalance != null ? ` · ${esc(usdtBalance)} USDT available` : ""}` : "connect a wallet to see live quotes"}</p>
     <div style="overflow-x:auto"><table>
-      <thead><tr><th>Stock</th><th class="num">Amount</th><th class="num">Per share</th><th class="num">You get</th></tr></thead>
+      <thead><tr><th>Stock</th><th class="num">Amount</th><th class="num">Per share</th><th class="num">You get (quote)</th></tr></thead>
       <tbody>${p.legs.map((l) => `<tr><td><b>${esc(l.ticker)}</b><br><code>${esc(l.symbol)}</code></td><td class="num">${money(l.usd)}</td>
-        <td class="num">${money(l.referenceSharePrice)}</td><td class="num">${q[l.ticker] ? (q[l.ticker].ok ? esc(q[l.ticker].to) : `<span class="fail">no quote</span>`) : "–"}</td></tr>`).join("") ||
+        <td class="num">${money(l.sharePrice)}</td><td class="num" id="q-${esc(l.ticker)}">${q[l.ticker] ? (q[l.ticker].ok ? `${esc(q[l.ticker].receive)} <code>${esc(q[l.ticker].symbol)}</code>` : `<span class="fail">no quote</span>`) : "–"}</td></tr>`).join("") ||
         `<tr><td colspan="4">None of these stocks can be bought right now.</td></tr>`}</tbody>
     </table></div>
     ${p.skipped.length ? `<ul class="skipped">${p.skipped.map((s) => `<li><b>${esc(s.ticker)}</b> left out: ${esc(s.reason)}</li>`).join("")}</ul>` : ""}
     ${p.notes.map((n) => `<div class="note">${esc(n)}</div>`).join("")}
-    ${!canBuy && p.legs.length ? `<div class="note">Some quotes failed, so buying is off. Try planning again in a moment.</div>` : ""}
-    <div class="actions"><button class="btn" data-close>Not now</button>${canBuy ? `<button class="btn primary" id="buy">Buy basket · ${money(p.totalUsd)}</button>` : ""}</div>`);
-  const buy = $("#buy");
-  if (buy) buy.onclick = async () => {
-    buy.disabled = true; buy.textContent = "Buying, confirming each order…";
-    try { renderReceipt(p, (await api("/api/buy", { planId: plan.planId })).results); }
-    catch (e) { sheet(`<h3>Buy failed</h3><p class="err">${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Close</button></div>`); }
-  };
+    ${w && !quoted && p.legs.length ? `<div class="note">Some quotes failed, so buying is off. Try planning again in a moment.</div>` : ""}
+    ${short$ ? `<div class="note">Your wallet has less USDT than this basket costs. Add USDT on BNB Chain or pick a smaller amount.</div>` : ""}
+    <div class="actions"><button class="btn" data-close>Not now</button>${
+      !w ? `<button class="btn primary" id="connect">Connect wallet</button>`
+      : quoted && !short$ ? `<button class="btn primary" id="buy">Buy basket · ${money(p.totalUsd)}</button>` : ""}</div>
+    ${quoted && !short$ ? `<p class="sub" style="margin-top:10px">Your wallet will ask you to confirm each stock (plus a one-time USDT approval if needed). Nothing is bought until you confirm.</p>` : ""}`);
+  $("#connect")?.addEventListener("click", async () => { try { await connect(); $("#plan").click(); } catch (e) { alert(e.message); } });
+  $("#buy")?.addEventListener("click", () => buyAll(plan));
+}
+
+async function waitReceipt(hash) {
+  for (let i = 0; i < 90; i++) {
+    const r = await eth().request({ method: "eth_getTransactionReceipt", params: [hash] }).catch(() => null);
+    if (r) { if (r.status !== "0x1") throw new Error("transaction failed on-chain"); return r; }
+    await sleep(2000);
+  }
+  throw new Error("transaction not confirmed yet; check your wallet");
+}
+
+async function buyLeg(planId, index, onStep) {
+  const leg = await api("/api/leg", { planId, index });
+  if (leg.approve) {
+    onStep("Approve USDT in your wallet…");
+    const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from: wallet, to: leg.approve.to, data: leg.approve.data }] });
+    onStep("Waiting for the approval…");
+    await waitReceipt(hash);
+  }
+  if (leg.rfq) {
+    onStep("Confirm the order in your wallet…");
+    const signature = await eth().request({ method: "eth_signTypedData_v4", params: [wallet, JSON.stringify(leg.rfq.typedData)] });
+    const sub = await api("/api/submit", { planId, index, signature });
+    for (let i = 0; i < 60; i++) {
+      onStep("Settling on-chain…");
+      const o = await api(`/api/order?id=${encodeURIComponent(sub.orderId)}`).catch(() => null);
+      if (o?.status === "FILLED") return { status: "FILLED", txHash: o.txHash, received: leg.receive };
+      if (o && ["FAILED", "EXPIRED", "CANCELLED"].includes(o.status)) throw new Error(`order ${o.status.toLowerCase()}`);
+      await sleep(3000);
+    }
+    return { status: "PENDING", orderId: sub.orderId };
+  }
+  onStep("Confirm the swap in your wallet…");
+  const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from: wallet, to: leg.tx.to, data: leg.tx.data, value: "0x" + BigInt(leg.tx.value || 0).toString(16) }] });
+  onStep("Settling on-chain…");
+  await waitReceipt(hash);
+  return { status: "FILLED", txHash: hash, received: leg.receive };
+}
+
+async function buyAll({ planId, plan: p }) {
+  const results = p.legs.map((l) => ({ ticker: l.ticker, usd: l.usd, status: "WAITING" }));
+  const draw = () => sheet(`
+    <h3>Buying ${esc(p.label)}</h3>
+    <p class="sub">Confirm each stock in your wallet. You can reject any of them.</p>
+    <table><tbody>${results.map((r) => `<tr><td><b>${esc(r.ticker)}</b></td><td class="num">${money(r.usd)}</td>
+      <td class="${r.status === "FILLED" ? "ok" : r.status === "FAILED" ? "fail" : ""}">${esc(r.step ?? r.status.toLowerCase())}</td></tr>`).join("")}</tbody></table>`);
+  draw();
+  for (let i = 0; i < p.legs.length; i++) {
+    try {
+      Object.assign(results[i], await buyLeg(planId, i, (step) => { results[i].step = step; draw(); }));
+      results[i].step = null;
+    } catch (e) {
+      Object.assign(results[i], { status: "FAILED", step: null, error: e.code === 4001 ? "you rejected it in your wallet" : String(e.message ?? e) });
+    }
+    draw();
+  }
+  renderReceipt(p, results);
 }
 
 function renderReceipt(p, results) {
-  const done = results.filter((r) => r.status === "FINISHED");
+  const done = results.filter((r) => r.status === "FILLED");
   if (done.length) { done.forEach((r) => basket.delete(r.ticker)); render(); renderTray(); }
   sheet(`
     <h3>${done.length === results.length ? "Basket bought 🎉" : `${done.length} of ${results.length} bought`}</h3>
-    <p class="sub">${money(done.reduce((s, r) => s + r.usd, 0))} spent · these are final order results, not just submissions</p>
+    <p class="sub">${money(done.reduce((s, r) => s + r.usd, 0))} spent · these are final settlement results, not just submissions</p>
     <div style="overflow-x:auto"><table><thead><tr><th>Stock</th><th class="num">Amount</th><th>Result</th><th>Proof</th></tr></thead><tbody>
       ${results.map((r) => `<tr><td><b>${esc(r.ticker)}</b></td><td class="num">${money(r.usd)}</td>
-        <td class="${r.status === "FINISHED" ? "ok" : "fail"}">${r.status === "FINISHED" ? `Bought${r.received ? ` · ${esc(r.received)}` : ""}` : r.status === "PENDING" ? "Still pending" : "Failed"}${r.error ? `<br><code>${esc(r.error)}</code>` : ""}</td>
+        <td class="${r.status === "FILLED" ? "ok" : "fail"}">${r.status === "FILLED" ? `Bought${r.received ? ` · ${esc(r.received)}` : ""}` : r.status === "PENDING" ? "Still settling" : "Not bought"}${r.error ? `<br><code>${esc(r.error)}</code>` : ""}</td>
         <td>${r.txHash ? `<a href="https://bscscan.com/tx/${esc(r.txHash)}" target="_blank" rel="noopener">BscScan ↗</a>` : "–"}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="actions"><button class="btn primary" data-close>Done</button></div>`);
 }
 
 // ── boot ──────────────────────────────────────────────────────────────────
+api("/api/config").then((c) => { config = c; renderThemes(); render(); }).catch(() => renderThemes());
 api("/api/tokens").then(({ tokens: t, market }) => {
   tokens = t;
   if (market) { $("#market").textContent = market.openState ? "Market open" : "Market closed"; $("#market").className = `pill ${market.openState ? "good" : ""}`; }
   render();
 }).catch((e) => { $("#list").innerHTML = `<p class="err">Couldn't load stocks: ${esc(e.message)}</p>`; });
+showWallet();
 renderTray();
 </script>
 </body>

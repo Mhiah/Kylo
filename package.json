@@ -1,5 +1,9 @@
 {
   "name": "kylo-workspace",
   "private": true,
-  "packageManager": "pnpm@10.24.0"
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "start": "node client/server.mjs",
+    "test:client": "node --test client/test/*.test.mjs"
+  }
 }
