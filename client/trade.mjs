@@ -193,19 +193,27 @@ export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd 
       approveData = a.data;
     }
   } else {
-    spender = built.tx?.signatureData?.[0] ?? route.approveTarget ?? null;
-    if (spender && !isAddress(spender)) spender = null;
-    if (spender) approveData = (await approveTx({ token: USDT_BSC, amount: approveAmount }))?.[0]?.data ?? null;
+    // DEX route: the router to approve is in tx.signatureData[0] or the quote's
+    // approveTarget; the approve endpoint also names it, so fall back to that.
+    spender = [built.tx?.signatureData?.[0], route.approveTarget].find(isAddress) ?? null;
+    const a = (await approveTx({ token: USDT_BSC, amount: approveAmount }))?.[0];
+    if (a?.data && (!spender || !isAddress(a.dexContractAddress) || a.dexContractAddress.toLowerCase() === spender.toLowerCase())) {
+      spender = spender ?? a.dexContractAddress;
+      approveData = a.data;
+    }
+    if (!spender || !approveData) throw new Error("couldn't find which contract to approve for this swap");
   }
 
   let approve = null;
-  if (spender && approveData && (await allowance(wallet, spender).catch(() => 0n)) < BigInt(amount)) {
+  const current = spender ? await allowance(wallet, spender).catch(() => 0n) : 0n;
+  if (spender && approveData && current < BigInt(amount)) {
     const sim = await simulate({ from: wallet, to: USDT_BSC, data: approveData }).catch((e) => ({ status: "UNKNOWN", failReason: String(e.message ?? e) }));
     approve = { to: USDT_BSC, data: approveData, spender, simulation: { status: sim?.status ?? null, failReason: sim?.failReason ?? null } };
   }
 
   const out = {
-    ticker: leg.ticker, mode, vendor: built.rfq?.vendor ?? route.vendorName, approve,
+    ticker: leg.ticker, mode, vendor: built.rfq?.vendor ?? built.routerResult?.vendorName ?? route.vendorName, approve,
+    allowance: spender ? { spender, current: formatUnits(current, USDT_DECIMALS, 2), needed: formatUnits(amount, USDT_DECIMALS, 2) } : null,
     receive: formatUnits(built.routerResult?.toTokenAmount ?? route.toTokenAmount, leg.decimals, 6),
   };
   if (mode === "RFQ") {
