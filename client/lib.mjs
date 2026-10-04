@@ -49,12 +49,12 @@ async function postAgent(agentUrl, body, headers = {}) {
 }
 
 /**
- * Ask Kylo for a basket plan, paying its x402 fee from the Agentic Wallet if
- * it answers 402. Returns { plan, payment } where payment is null when the
- * agent is free (price 0, local dev).
+ * Send one request to Kylo's x402 route, paying its fee from the Agentic
+ * Wallet if it answers 402. Returns { result, payment }; payment is null when
+ * the agent is free (price 0, local dev).
  */
-export async function getPlan(agentUrl, { theme, usd, maxLegs, allowEarnings }) {
-  const request = { prompt: JSON.stringify({ theme, usd: Number(usd), maxLegs, allowEarnings: Boolean(allowEarnings) }) };
+export async function callAgent(agentUrl, promptObj) {
+  const request = { prompt: JSON.stringify(promptObj) };
   let res = await postAgent(agentUrl, request);
   let payment = null;
   if (res.status === 402) {
@@ -80,7 +80,24 @@ export async function getPlan(agentUrl, { theme, usd, maxLegs, allowEarnings }) 
   }
   if (!res.ok) throw new Error(`Kylo answered HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const { result } = await res.json();
-  return { plan: typeof result === "string" ? JSON.parse(result) : result, payment };
+  return { result: typeof result === "string" ? safeJson(result) : result, payment };
+}
+
+/** A basket plan for a preset theme or a hand-picked list of tickers. */
+export async function getPlan(agentUrl, { theme, tickers, usd, maxLegs, allowEarnings }) {
+  const { result, payment } = await callAgent(agentUrl, {
+    ...(tickers?.length ? { tickers } : { theme }),
+    usd: Number(usd),
+    maxLegs,
+    allowEarnings: Boolean(allowEarnings),
+  });
+  return { plan: result, payment };
+}
+
+/** Kylo's paid, LLM-written deeper take on one ticker. */
+export async function getTake(agentUrl, ticker) {
+  const { result, payment } = await callAgent(agentUrl, { action: "insight", ticker });
+  return { take: result, payment };
 }
 
 function legArgs(plan, leg, slippage) {

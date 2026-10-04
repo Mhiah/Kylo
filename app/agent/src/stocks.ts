@@ -129,6 +129,27 @@ export function assetDynamic(chainId: string, contractAddress: string): Promise<
   });
 }
 
+export function assetMeta(chainId: string, contractAddress: string): Promise<{
+  name: string;
+  ticker: string;
+  companyInfo?: { companyName?: string; description?: string; industry?: string; ceo?: string; conceptsEn?: string[] };
+}> {
+  return getJson("/v1/public/wallet-direct/buw/wallet/market/token/rwa/meta/ai", { chainId, contractAddress });
+}
+
+/** Everything Kylo knows about one ticker on BSC, for the LLM's deeper take. */
+export async function tokenSnapshot(ticker: string): Promise<Record<string, unknown>> {
+  const tokens = await listStockTokens();
+  const t = tokens.find((x) => x.chainId === BSC_CHAIN_ID && x.ticker.toUpperCase() === ticker.toUpperCase());
+  if (!t) throw new Error(`no tokenized ${ticker} on BSC`);
+  const [meta, dynamic, status] = await Promise.all([
+    assetMeta(t.chainId, t.contractAddress).catch(() => null),
+    assetDynamic(t.chainId, t.contractAddress).catch(() => null),
+    assetStatus(t.chainId, t.contractAddress).catch(() => null),
+  ]);
+  return { token: t, company: meta?.companyInfo ?? null, market: dynamic, status };
+}
+
 /** Why a leg cannot be bought right now, or null if it can. */
 export function blockReason(s: AssetStatus, allowEarnings: boolean): string | null {
   if (s.reasonCode === "ASSET_PAUSED") return `paused (${s.reasonMsg ?? "corporate action"})`;
@@ -142,7 +163,9 @@ export function blockReason(s: AssetStatus, allowEarnings: boolean): string | nu
 }
 
 export interface BasketRequest {
-  theme: string;
+  /** A preset theme id, or omit and pass `tickers` for a hand-picked basket. */
+  theme?: string;
+  tickers?: string[];
   usd: number;
   maxLegs?: number;
   allowEarnings?: boolean;
@@ -150,12 +173,16 @@ export interface BasketRequest {
 }
 
 export async function planBasket(req: BasketRequest): Promise<BasketPlan> {
-  const theme = THEMES[req.theme.toLowerCase()];
+  const custom = (req.tickers ?? []).map((t) => t.trim().toUpperCase()).filter(Boolean);
+  const theme = custom.length
+    ? { label: "Custom basket", tickers: [...new Set(custom)] }
+    : THEMES[(req.theme ?? "").toLowerCase()];
   if (!theme) {
-    throw new Error(`unknown theme "${req.theme}"; choose one of ${Object.keys(THEMES).join(", ")}`);
+    throw new Error(`unknown theme "${req.theme}"; choose one of ${Object.keys(THEMES).join(", ")} or pass tickers`);
   }
+  if (theme.tickers.length > 20) throw new Error("at most 20 tickers per basket");
   if (!(req.usd > 0)) throw new Error("usd must be positive");
-  const maxLegs = Math.max(1, Math.min(req.maxLegs ?? 5, 10));
+  const maxLegs = Math.max(1, Math.min(req.maxLegs ?? (custom.length || 5), 20));
   const exclude = new Set((req.exclude ?? []).map((t) => t.toUpperCase()));
 
   const [tokens, market] = await Promise.all([listStockTokens(), marketStatus()]);
@@ -227,7 +254,7 @@ export async function planBasket(req: BasketRequest): Promise<BasketPlan> {
   if (legs.length === 0) notes.push("No leg is buyable right now; nothing to execute.");
 
   return {
-    theme: req.theme.toLowerCase(),
+    theme: custom.length ? "custom" : (req.theme ?? "").toLowerCase(),
     label: theme.label,
     chainId: BSC_CHAIN_ID,
     fundingToken: USDT_BSC,

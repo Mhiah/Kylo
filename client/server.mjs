@@ -3,9 +3,12 @@
  * Kylo one-tap web app. Runs on YOUR machine next to the signed-in `baw`
  * CLI, serves the page in client/web/, and turns taps into wallet actions:
  *
- *   GET  /api/wallet            → Agentic Wallet status + address
- *   POST /api/plan  {theme,usd} → pays Kylo over x402, returns plan + quotes
- *   POST /api/buy   {planId}    → buys every leg of that plan, returns receipt
+ *   GET  /api/wallet                  → Agentic Wallet status + address
+ *   GET  /api/tokens                  → every tokenized stock on BSC (free, public data)
+ *   GET  /api/token?ticker=NVDA       → detail + rule-based insight box (free)
+ *   POST /api/take  {ticker}          → Kylo's paid deeper take (x402)
+ *   POST /api/plan  {tickers|theme,usd} → pays Kylo over x402, returns plan + quotes
+ *   POST /api/buy   {planId}          → buys every leg of that plan, returns receipt
  *
  *   KYLO_AGENT_URL=https://<agent> node client/server.mjs   # then open http://localhost:4402
  *
@@ -17,7 +20,8 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { baw, buyLegs, getPlan, quoteLegs } from "./lib.mjs";
+import { marketStatus, tokenDetail, tokenList } from "./data.mjs";
+import { baw, buyLegs, getPlan, getTake, quoteLegs } from "./lib.mjs";
 
 const PORT = Number(process.env.PORT ?? 4402);
 const AGENT = process.env.KYLO_AGENT_URL ?? "http://localhost:8080";
@@ -33,10 +37,16 @@ const routes = {
     const address = await baw("wallet", "address").catch(() => null);
     return { status, address, agent: AGENT };
   },
+  "GET /api/tokens": async () => ({ tokens: await tokenList(), market: await marketStatus().catch(() => null) }),
+  "GET /api/token": async (_body, url) => tokenDetail(url.searchParams.get("ticker") ?? ""),
+  "POST /api/take": async (body) => {
+    if (!body.ticker) throw httpError(400, "ticker is required");
+    return getTake(AGENT, body.ticker);
+  },
   "POST /api/plan": async (body) => {
-    const { theme, usd, maxLegs, allowEarnings, slippage } = body;
-    if (!theme || !(Number(usd) > 0)) throw httpError(400, "theme and a positive usd are required");
-    const { plan, payment } = await getPlan(AGENT, { theme, usd, maxLegs, allowEarnings });
+    const { theme, tickers, usd, maxLegs, allowEarnings, slippage } = body;
+    if ((!theme && !tickers?.length) || !(Number(usd) > 0)) throw httpError(400, "pick at least one stock and a positive amount");
+    const { plan, payment } = await getPlan(AGENT, { theme, tickers, usd, maxLegs, allowEarnings });
     const quotes = plan.legs.length ? await quoteLegs(plan, slippage) : [];
     const planId = randomUUID();
     plans.set(planId, { plan, slippage, at: Date.now(), bought: false });
@@ -59,7 +69,7 @@ createServer(async (req, res) => {
   try {
     if (route) {
       const body = req.method === "POST" ? JSON.parse((await readBody(req)) || "{}") : {};
-      return send(res, 200, JSON.stringify(await route(body)), "application/json");
+      return send(res, 200, JSON.stringify(await route(body, url)), "application/json");
     }
     if (req.method !== "GET") return send(res, 405, "method not allowed");
     const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);

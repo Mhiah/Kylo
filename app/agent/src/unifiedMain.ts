@@ -91,7 +91,7 @@ import {
   B402Seller,
 } from "@bnbagent/studio-runtime/b402";
 import { generateText, stepCountIs } from "ai";
-import { planBasket, type BasketRequest } from "./stocks.js";
+import { planBasket, tokenSnapshot, type BasketRequest } from "./stocks.js";
 import { resolveStorageMode } from "@bnbagent/studio-runtime/storage";
 import express from "express";
 import { buildAgentCard } from "./agentCard.js";
@@ -202,8 +202,10 @@ export function buildRunWork(): RunWork {
     // the plan is deterministic code, so it's cheaper and can't hallucinate.
     const structured = parseBasketRequest(prompt);
     if (structured) return JSON.stringify(await planBasket(structured));
-
+    const insight = parseInsightRequest(prompt);
     model ??= buildModel(); // managed model with the auto-renew hook (delivery only)
+    if (insight) return deeperTake(model, insight.ticker, abortSignal);
+
     const result = await generateText({
       model,
       system:
@@ -233,11 +235,60 @@ export function buildRunWork(): RunWork {
   };
 }
 
+/** A JSON insight request (`{"action":"insight","ticker":"NVDA"}`), or null. */
+export function parseInsightRequest(prompt: string): { ticker: string } | null {
+  try {
+    const v = JSON.parse(prompt) as { action?: string; ticker?: string };
+    if (v?.action === "insight" && typeof v.ticker === "string" && /^[A-Za-z.]{1,10}$/.test(v.ticker)) {
+      return { ticker: v.ticker.toUpperCase() };
+    }
+  } catch {
+    // not JSON
+  }
+  return null;
+}
+
+/**
+ * Kylo's paid "deeper take" on one tokenized stock: the LLM reads ONLY the
+ * live snapshot below and returns balanced reasons, never a price target.
+ */
+async function deeperTake(
+  model: ReturnType<typeof buildModel>,
+  ticker: string,
+  abortSignal?: AbortSignal,
+): Promise<string> {
+  const snapshot = await tokenSnapshot(ticker);
+  const result = await generateText({
+    model,
+    system:
+      "You are Kylo, explaining one tokenized US stock on BNB Chain to a " +
+      "beginner. Use ONLY the JSON data you are given; if a number is missing, " +
+      "say so instead of guessing. On-chain token price is per token: divide by " +
+      "sharesMultiplier for the per-share price. tokenInfo.volume24h is US stock " +
+      "volume, not on-chain volume. Reply with ONLY a JSON object: " +
+      '{"summary": "2 plain sentences on what the company does and how the stock ' +
+      'looks now", "reasonsToConsider": ["..."], "reasonsToHoldOff": ["..."], ' +
+      '"tokenNotes": ["anything specific to holding the token rather than the ' +
+      'share: trading status, multiplier, market hours"], "read": "one short ' +
+      'balanced sentence"}. 2-4 items per list, each under 20 words. No price ' +
+      "targets, no instructions to buy or sell.",
+    prompt: JSON.stringify(snapshot),
+    abortSignal,
+  });
+  const text = result.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  try {
+    return JSON.stringify({ ticker, ...JSON.parse(text) });
+  } catch {
+    return JSON.stringify({ ticker, summary: text });
+  }
+}
+
 /** A JSON basket request (`{"theme":"ai","usd":50}`), or null for free text. */
 export function parseBasketRequest(prompt: string): BasketRequest | null {
   try {
     const v = JSON.parse(prompt) as Partial<BasketRequest>;
-    if (v && typeof v.theme === "string" && typeof v.usd === "number") {
+    const hasBasket = typeof v?.theme === "string" || Array.isArray(v?.tickers);
+    if (v && hasBasket && typeof v.usd === "number") {
       return v as BasketRequest;
     }
   } catch {

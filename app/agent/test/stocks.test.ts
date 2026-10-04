@@ -51,3 +51,11 @@ test("paused assets are always blocked", () => {
 test("unknown theme is rejected", async () => {
   await assert.rejects(planBasket({ theme: "nope", usd: 5 }), /unknown theme/);
 });
+
+test("custom tickers build a hand-picked basket", async () => {
+  const plan = await planBasket({ tickers: ["amd", "NVDA", "AMD"], usd: 9 });
+  assert.equal(plan.label, "Custom basket");
+  assert.equal(plan.theme, "custom");
+  assert.deepEqual(plan.legs.map((l) => l.ticker), ["AMD", "NVDA"]);
+  assert.equal(Math.round(plan.legs.reduce((s, l) => s + l.usd, 0) * 100), 900);
+});

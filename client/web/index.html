@@ -7,118 +7,195 @@
 <link rel="icon" href="data:,">
 <style>
   :root {
-    --bg: #f7f7f5; --card: #ffffff; --ink: #16181d; --muted: #666b75; --line: #e4e4e0;
-    --accent: #f0b90b; --accent-ink: #1a1400; --good: #1a7f4b; --bad: #b42318; --warn: #9a6700;
-    --radius: 14px;
+    --bg: #f6f6f3; --card: #ffffff; --card2: #fafaf8; --ink: #15171c; --muted: #646a74; --line: #e3e3de;
+    --accent: #f0b90b; --accent-ink: #1a1400; --good: #17804a; --bad: #b42318; --warn: #a15c00;
+    --good-bg: #e8f5ee; --bad-bg: #fdecea; --warn-bg: #fdf3e2; --muted-bg: #efefeb;
+    --radius: 14px; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 24px rgba(0,0,0,.05);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0f1013; --card: #181a1f; --ink: #eceef2; --muted: #9aa0ab; --line: #2a2d34;
-            --good: #4ade80; --bad: #f87171; --warn: #fbbf24; }
+    :root { --bg: #0e0f12; --card: #17191e; --card2: #1c1f25; --ink: #eceef2; --muted: #9aa0ab; --line: #2a2d34;
+            --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+            --good-bg: #12301f; --bad-bg: #3a1614; --warn-bg: #3a2a0c; --muted-bg: #23262d; --shadow: none; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button { font-family: inherit; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 160px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
-  .wallet { font-size: 13px; color: var(--muted); }
-  .wallet b { color: var(--ink); font-weight: 600; }
-  p.lead { color: var(--muted); margin: 6px 0 22px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 0 10px; }
-  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-  .theme { background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius);
-           padding: 14px; text-align: left; cursor: pointer; color: inherit; font: inherit; }
-  .theme strong { display: block; font-size: 15px; }
-  .theme small { color: var(--muted); font-size: 12px; }
-  .theme[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-  .amounts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .chip { background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 16px;
-          cursor: pointer; font: inherit; color: inherit; }
-  .chip[aria-pressed="true"] { border-color: var(--accent); }
-  input[type=number] { width: 110px; padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--line);
-                       background: var(--card); color: inherit; font: inherit; }
-  label.opt { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; margin-top: 14px; }
-  .go { margin-top: 22px; width: 100%; padding: 16px; border: 0; border-radius: var(--radius);
-        background: var(--accent); color: var(--accent-ink); font-family: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
-  .go:disabled { opacity: .5; cursor: progress; }
-  .go.secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--line); margin-top: 10px; font-weight: 500; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-top: 22px; }
-  .card h3 { margin: 0 0 4px; font-size: 18px; }
-  .sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--muted-bg); color: var(--muted); white-space: nowrap; }
+  .pill.good { background: var(--good-bg); color: var(--good); }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  p.lead { color: var(--muted); margin: 6px 0 16px; }
+
+  .toolbar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line);
+                  background: var(--card); color: inherit; font: inherit; }
+  .search input:focus { outline: none; border-color: var(--accent); }
+  .search select { padding: 0 10px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: inherit; font: inherit; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+  .chip { flex: none; background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 13px;
+          cursor: pointer; color: inherit; font-size: 14px; }
+  .chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
+  .themebar { display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px;
+              padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px dashed var(--line); font-size: 14px; }
+  .themebar.on { display: flex; }
+  .linkbtn { background: none; border: 0; color: var(--ink); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 0; font-size: 14px; }
+  .count { color: var(--muted); font-size: 13px; margin: 10px 2px 6px; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .row { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .row-main { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; align-items: center; padding: 12px 12px 12px 14px; cursor: pointer; }
+  .logo { width: 36px; height: 36px; border-radius: 50%; background: var(--muted-bg); display: grid; place-items: center;
+          font-size: 11px; font-weight: 700; color: var(--muted); overflow: hidden; }
+  .logo img { width: 100%; height: 100%; object-fit: cover; }
+  .who { min-width: 0; }
+  .who b { font-size: 15px; }
+  .who .name { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .px { text-align: right; font-variant-numeric: tabular-nums; }
+  .px .p { font-weight: 600; }
+  .px .c { font-size: 13px; }
+  .up { color: var(--good); } .down { color: var(--bad); }
+  .add { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card);
+         color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+  .add[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .row-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 14px 10px 62px; margin-top: -4px; }
+  .more { margin-left: auto; font-size: 13px; color: var(--muted); }
+
+  .insight { border-top: 1px solid var(--line); padding: 16px; background: var(--card2); border-radius: 0 0 var(--radius) var(--radius); }
+  .read { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .read .pill { font-size: 13px; font-weight: 600; padding: 4px 11px; }
+  .about { color: var(--muted); font-size: 14px; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .about.open { -webkit-line-clamp: unset; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .stat small { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .stat b { font-variant-numeric: tabular-nums; font-size: 15px; }
+  .range { height: 6px; background: var(--line); border-radius: 3px; position: relative; margin-top: 7px; }
+  .range i { position: absolute; top: -3px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); transform: translateX(-50%); }
+  .spark { width: 100%; height: 56px; margin-bottom: 12px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 620px) { .cols { grid-template-columns: 1fr; } .row-sub { padding-left: 14px; } }
+  .cols h4 { margin: 0 0 6px; font-size: 13px; }
+  .yes ul, .no ul, .tok ul { margin: 0; padding: 0; list-style: none; font-size: 14px; }
+  .yes li, .no li, .tok li { padding: 4px 0 4px 22px; position: relative; }
+  .yes li::before, .no li::before, .tok li::before { position: absolute; left: 0; top: 4px; font-weight: 700; }
+  .yes li::before { content: "✓"; color: var(--good); }
+  .no li::before { content: "!"; color: var(--warn); left: 5px; }
+  .tok li::before { content: "i"; color: var(--muted); left: 5px; font-style: italic; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .deeper { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1.5px dashed var(--line); }
+  .deeper p { margin: 0 0 8px; }
+  .btn { padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; font-size: 14px; font-weight: 500; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+  .foot { margin-top: 12px; font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+  a { color: var(--ink); text-underline-offset: 3px; }
+
+  .tray { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--card); border-top: 1px solid var(--line);
+          box-shadow: 0 -8px 30px rgba(0,0,0,.08); transform: translateY(110%); transition: transform .2s; }
+  .tray.on { transform: none; }
+  .tray-in { max-width: 860px; margin: 0 auto; padding: 12px 16px 16px; }
+  .tray-top { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 10px; }
+  .tray-top b { flex: none; }
+  .tag { flex: none; display: inline-flex; gap: 6px; align-items: center; background: var(--muted-bg); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 13px; }
+  .tag button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+  .tray-bot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .amt { display: flex; gap: 6px; flex-wrap: wrap; }
+  .amt input { width: 92px; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: inherit; font: inherit; }
+  .tray-bot .btn.primary { margin-left: auto; padding: 12px 18px; font-size: 15px; }
+  label.opt { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; }
+
+  .sheet { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: none; align-items: flex-end; justify-content: center; }
+  .sheet.on { display: flex; }
+  .sheet-in { background: var(--card); width: 100%; max-width: 760px; max-height: 88vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 18px 16px 24px; }
+  @media (min-width: 700px) { .sheet { align-items: center; } .sheet-in { border-radius: 18px; } }
+  .sheet h3 { margin: 0 0 4px; font-size: 19px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
   td { padding: 9px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .bar { height: 6px; background: var(--line); border-radius: 3px; margin-top: 5px; }
-  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-  code { font-size: 12px; color: var(--muted); word-break: break-all; }
-  ul.skipped { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; }
-  ul.skipped li { padding: 4px 0; color: var(--muted); }
-  ul.skipped b { color: var(--ink); font-weight: 600; }
-  .note { color: var(--warn); font-size: 13px; margin-top: 12px; }
-  a { color: var(--ink); text-underline-offset: 3px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { font-size: 11px; color: var(--muted); word-break: break-all; }
+  ul.skipped { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+  ul.skipped li { padding: 3px 0; }
+  .note { color: var(--warn); font-size: 13px; margin-top: 10px; }
   .ok { color: var(--good); } .fail { color: var(--bad); }
-  .err { background: color-mix(in srgb, var(--bad) 12%, var(--card)); border-color: var(--bad); }
-  .tableWrap { overflow-x: auto; }
-  footer { color: var(--muted); font-size: 12px; margin-top: 28px; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+  .actions .btn { flex: 1; padding: 13px; font-size: 15px; }
+  .err { color: var(--bad); }
+  .skeleton { height: 64px; border-radius: var(--radius); background: linear-gradient(90deg, var(--card) 0%, var(--card2) 50%, var(--card) 100%); background-size: 200% 100%; animation: sh 1.2s infinite; border: 1px solid var(--line); }
+  @keyframes sh { to { background-position: -200% 0; } }
+  .disclaimer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Kylo<span>.</span></h1>
-    <div class="wallet" id="wallet">Checking Agentic Wallet…</div>
+    <div class="pills"><span class="pill" id="market">Market…</span><span class="pill" id="wallet">Wallet…</span></div>
   </header>
-  <p class="lead">Pick a theme, pick an amount, tap once. You get a slice of every tradable company in it, as tokenized stocks in your own wallet.</p>
+  <p class="lead">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's take, add the ones you like, and buy them all in one tap.</p>
 
-  <h2>1 · Theme</h2>
-  <div class="themes" id="themes"></div>
-
-  <h2>2 · Amount (USDT)</h2>
-  <div class="amounts" id="amounts">
-    <button class="chip" data-usd="10">$10</button>
-    <button class="chip" data-usd="25" aria-pressed="true">$25</button>
-    <button class="chip" data-usd="50">$50</button>
-    <button class="chip" data-usd="100">$100</button>
-    <input type="number" id="custom" min="1" step="1" placeholder="Other" aria-label="Custom amount">
+  <div class="toolbar">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search a company, ticker or theme (Apple, NVDA, cloud…)" autocomplete="off">
+      <select id="sort" aria-label="Sort">
+        <option value="cap">Biggest</option>
+        <option value="up">Top gainers</option>
+        <option value="down">Top losers</option>
+        <option value="az">A–Z</option>
+      </select>
+    </div>
+    <div class="chips" id="themes"></div>
+    <div class="themebar" id="themebar"><span id="themetext"></span><button class="linkbtn" id="addall">Add all to basket</button></div>
   </div>
-  <label class="opt"><input type="checkbox" id="earnings"> Include stocks restricted for earnings</label>
 
-  <button class="go" id="plan">Plan my basket</button>
-  <div id="out"></div>
-
-  <footer>Kylo charges a small planning fee over x402, paid from your Agentic Wallet. Purchases stay inside the daily limit and token list you set in the Binance app. Not investment advice.</footer>
+  <div class="count" id="count"></div>
+  <div class="list" id="list">
+    <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+  </div>
+  <p class="disclaimer">Kylo's take is built from live public data and simple, visible rules. It isn't investment advice, and every decision is yours. Purchases stay inside the daily limit and token list you set for Agentic Wallet in the Binance app.</p>
 </main>
+
+<div class="tray" id="tray"><div class="tray-in">
+  <div class="tray-top" id="traytop"></div>
+  <div class="tray-bot">
+    <div class="amt" id="amt">
+      <button class="chip" data-usd="10">$10</button><button class="chip" data-usd="25" aria-pressed="true">$25</button><button class="chip" data-usd="50">$50</button>
+      <input type="number" id="custom" min="1" step="1" placeholder="Other $" aria-label="Custom amount">
+    </div>
+    <label class="opt"><input type="checkbox" id="earnings"> include earnings-week stocks</label>
+    <button class="btn primary" id="plan">Plan basket</button>
+  </div>
+</div></div>
+
+<div class="sheet" id="sheet"><div class="sheet-in" id="sheetin"></div></div>
 
 <script>
 const THEMES = [
-  { id: "ai", label: "AI leaders", hint: "NVDA, MSFT, GOOGL, META…" },
-  { id: "semis", label: "Semiconductors", hint: "NVDA, AMD, AVGO, TSM…" },
-  { id: "bigtech", label: "Big Tech", hint: "AAPL, MSFT, AMZN, TSLA…" },
-  { id: "energy", label: "Energy", hint: "XOM, CVX, COP, NEE…" },
-  { id: "dividends", label: "Dividend payers", hint: "KO, PEP, JNJ, PG…" },
+  { id: "all", label: "All" },
+  { id: "ai", label: "AI", tickers: ["NVDA","MSFT","GOOGL","META","AMD","PLTR","AVGO"], tag: /\bAI\b|artificial intelligence/i },
+  { id: "semis", label: "Semiconductors", tickers: ["NVDA","AMD","AVGO","TSM","INTC","QCOM","MU","ARM"], tag: /semiconductor|chip/i },
+  { id: "bigtech", label: "Big Tech", tickers: ["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA"] },
+  { id: "energy", label: "Energy", tickers: ["XOM","CVX","COP","OXY","SLB","NEE"], tag: /oil|energy|gas/i },
+  { id: "dividends", label: "Dividend payers", tickers: ["KO","PEP","JNJ","PG","XOM","CVX","ABBV"] },
+  { id: "crypto", label: "Crypto stocks", tickers: ["COIN","MSTR","HOOD","MARA","RIOT"], tag: /crypto|bitcoin|blockchain/i },
+  { id: "ev", label: "EV & autos", tickers: ["TSLA","RIVN","NIO","GM","F"], tag: /electric vehicle|\bEV\b/i },
 ];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-let theme = "ai", usd = 25, current = null;
+const money = (n, d = 2) => n == null ? "–" : "$" + n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+const big = (n) => n == null ? "–" : n >= 1e12 ? `$${(n/1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n/1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n/1e3).toFixed(0)}K` : `$${n.toFixed(0)}`;
+const chg = (n) => n == null ? "" : `<span class="${n >= 0 ? "up" : "down"}">${n >= 0 ? "▲" : "▼"} ${Math.abs(n).toFixed(2)}%</span>`;
 
-$("#themes").innerHTML = THEMES.map((t) =>
-  `<button class="theme" data-id="${t.id}" aria-pressed="${t.id === theme}"><strong>${t.label}</strong><small>${t.hint}</small></button>`).join("");
-$("#themes").addEventListener("click", (e) => {
-  const b = e.target.closest(".theme"); if (!b) return;
-  theme = b.dataset.id;
-  document.querySelectorAll(".theme").forEach((x) => x.setAttribute("aria-pressed", x === b));
-});
-$("#amounts").addEventListener("click", (e) => {
-  const b = e.target.closest(".chip"); if (!b) return;
-  usd = Number(b.dataset.usd); $("#custom").value = "";
-  document.querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", x === b));
-});
-$("#custom").addEventListener("input", (e) => {
-  usd = Number(e.target.value) || 0;
-  document.querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", "false"));
-});
+let tokens = [], theme = "all", usd = 25, open = null, plan = null;
+const basket = new Set();
+const details = new Map(); // ticker → detail (or promise)
 
 async function api(path, body) {
   const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
@@ -127,79 +204,220 @@ async function api(path, body) {
   return data;
 }
 
+// ── header ────────────────────────────────────────────────────────────────
 api("/api/wallet").then((w) => {
-  const addr = typeof w.address === "string" ? w.address : (w.address?.address ?? w.address?.[0]?.address ?? "");
-  $("#wallet").innerHTML = `Agentic Wallet <b>${addr ? esc(addr.slice(0, 6) + "…" + addr.slice(-4)) : "connected"}</b>`;
-}).catch(() => { $("#wallet").innerHTML = `<span class="fail">Agentic Wallet not signed in. Run <code>baw auth signin</code>.</span>`; });
+  const a = typeof w.address === "string" ? w.address : (w.address?.address ?? w.address?.[0]?.address ?? "");
+  $("#wallet").textContent = a ? `Wallet ${a.slice(0, 6)}…${a.slice(-4)}` : "Wallet connected";
+  $("#wallet").className = "pill good";
+}).catch(() => { $("#wallet").textContent = "Wallet not signed in"; $("#wallet").className = "pill bad"; $("#wallet").title = "Run: baw auth signin"; });
 
-function showError(msg) { $("#out").innerHTML = `<div class="card err"><b>Something went wrong.</b><p class="sub">${esc(msg)}</p></div>`; }
+// ── themes & search ───────────────────────────────────────────────────────
+$("#themes").innerHTML = THEMES.map((t) => `<button class="chip" data-id="${t.id}" aria-pressed="${t.id === theme}">${t.label}</button>`).join("");
+$("#themes").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  theme = b.dataset.id;
+  document.querySelectorAll("#themes .chip").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  render();
+});
+$("#q").addEventListener("input", render);
+$("#sort").addEventListener("change", render);
+$("#addall").addEventListener("click", () => { visible().forEach((t) => t.status.tone !== "bad" && basket.add(t.ticker)); render(); renderTray(); });
 
-$("#plan").addEventListener("click", async () => {
-  if (!(usd > 0)) return showError("Enter an amount first.");
-  const btn = $("#plan"); btn.disabled = true; btn.textContent = "Paying Kylo and planning…";
-  $("#out").innerHTML = "";
-  try {
-    current = await api("/api/plan", { theme, usd, allowEarnings: $("#earnings").checked });
-    renderPlan(current);
-  } catch (e) { showError(e.message); }
-  finally { btn.disabled = false; btn.textContent = "Plan my basket"; }
+function inTheme(t) {
+  const th = THEMES.find((x) => x.id === theme);
+  if (!th || th.id === "all") return true;
+  return th.tickers?.includes(t.ticker) || (th.tag && t.tags.some((g) => th.tag.test(g)));
+}
+function visible() {
+  const q = $("#q").value.trim().toLowerCase();
+  const list = tokens.filter((t) => inTheme(t) && (!q ||
+    t.ticker.toLowerCase().includes(q) || t.name.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q) ||
+    (t.industry ?? "").toLowerCase().includes(q) || t.tags.some((g) => g.toLowerCase().includes(q))));
+  const s = $("#sort").value;
+  const by = { cap: (a, b) => (b.stockMarketCap ?? 0) - (a.stockMarketCap ?? 0), up: (a, b) => (b.change24hPct ?? -1e9) - (a.change24hPct ?? -1e9),
+               down: (a, b) => (a.change24hPct ?? 1e9) - (b.change24hPct ?? 1e9), az: (a, b) => a.ticker.localeCompare(b.ticker) }[s];
+  return list.sort(by);
+}
+
+// ── token list ────────────────────────────────────────────────────────────
+function logo(t) {
+  return `<div class="logo">${t.icon ? `<img src="${esc(t.icon)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(t.ticker.slice(0, 4))}</div>`;
+}
+function render() {
+  const list = visible();
+  $("#count").textContent = tokens.length ? `${list.length} of ${tokens.length} stocks` : "";
+  const th = THEMES.find((x) => x.id === theme);
+  $("#themebar").classList.toggle("on", theme !== "all" && list.length > 0);
+  $("#themetext").textContent = th && theme !== "all" ? `${th.label}: ${list.length} stocks` : "";
+  if (!tokens.length) return;
+  if (!list.length) { $("#list").innerHTML = `<p class="empty">No stock matches “${esc($("#q").value)}”. Try a company name or ticker.</p>`; return; }
+  $("#list").innerHTML = list.map((t) => `
+    <div class="row" data-t="${esc(t.ticker)}">
+      <div class="row-main" data-act="toggle">
+        ${logo(t)}
+        <div class="who"><b>${esc(t.ticker)}</b><div class="name">${esc(t.name)}</div></div>
+        <div class="px"><div class="p">${money(t.sharePrice)}</div><div class="c">${chg(t.change24hPct)}</div></div>
+        <button class="add" data-act="add" aria-pressed="${basket.has(t.ticker)}" aria-label="${basket.has(t.ticker) ? "Remove from" : "Add to"} basket" ${t.status.tone === "bad" ? "disabled title='Paused right now'" : ""}>${basket.has(t.ticker) ? "✓" : "+"}</button>
+      </div>
+      <div class="row-sub" data-act="toggle">
+        <span class="pill ${t.status.tone}">${esc(t.status.label)}</span>
+        ${t.industry ? `<span class="pill">${esc(t.industry)}</span>` : ""}
+        <span class="more">${open === t.ticker ? "Hide Kylo's take ▲" : "Kylo's take ▼"}</span>
+      </div>
+      ${open === t.ticker ? `<div class="insight" id="ins">${insightHtml(t.ticker)}</div>` : ""}
+    </div>`).join("");
+}
+$("#list").addEventListener("click", (e) => {
+  const row = e.target.closest(".row"); if (!row) return;
+  const tk = row.dataset.t;
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "add") { basket.has(tk) ? basket.delete(tk) : basket.add(tk); render(); renderTray(); return; }
+  if (act === "toggle") { open = open === tk ? null : tk; render(); if (open) loadDetail(tk); return; }
+  if (e.target.closest("[data-deeper]")) return askDeeper(tk);
+  if (e.target.closest("[data-about]")) e.target.closest("[data-about]").classList.toggle("open");
 });
 
-function renderPlan({ plan, payment, quotes }) {
-  const q = Object.fromEntries((quotes || []).map((x) => [x.ticker, x]));
-  const rows = plan.legs.map((l) => `
-    <tr>
-      <td><b>${esc(l.ticker)}</b><br><code>${esc(l.symbol)} · ${esc(l.contractAddress)}</code></td>
-      <td class="num">$${l.usd.toFixed(2)}<div class="bar"><i style="width:${(l.weight * 100).toFixed(1)}%"></i></div></td>
-      <td class="num">${l.referenceSharePrice != null ? "$" + l.referenceSharePrice.toFixed(2) : "–"}</td>
-      <td class="num">${q[l.ticker] ? (q[l.ticker].ok ? esc(q[l.ticker].to) : `<span class="fail">no quote</span>`) : "–"}</td>
-    </tr>`).join("");
-  const skipped = plan.skipped.map((s) => `<li><b>${esc(s.ticker)}</b> skipped: ${esc(s.reason)}</li>`).join("");
-  const notes = plan.notes.map((n) => `<div class="note">${esc(n)}</div>`).join("");
-  const fee = payment ? `Kylo fee paid: ${esc(payment.amount)} ${esc(payment.token)} (≈$${esc(payment.amountUsd)})` : "Kylo fee: free (local mode)";
-  const canBuy = plan.legs.length > 0 && (quotes || []).every((x) => x.ok);
-  $("#out").innerHTML = `
-    <div class="card">
-      <h3>${esc(plan.label)} · $${plan.totalUsd.toFixed(2)} across ${plan.legs.length} stocks</h3>
-      <p class="sub">${fee} · planned ${new Date(plan.generatedAt).toLocaleTimeString()} · BNB Chain</p>
-      <div class="tableWrap"><table>
-        <thead><tr><th>Stock</th><th class="num">Amount</th><th class="num">Per share</th><th class="num">You get</th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="4">Nothing in this theme is buyable right now.</td></tr>`}</tbody>
-      </table></div>
-      ${skipped ? `<ul class="skipped">${skipped}</ul>` : ""}
-      ${notes}
-      ${canBuy ? `<button class="go" id="buy">Buy basket · $${plan.totalUsd.toFixed(2)}</button>` :
-        plan.legs.length ? `<div class="note">Some quotes failed, so buying is disabled. Plan again in a moment.</div>` : ""}
-      <button class="go secondary" id="replan">Plan again</button>
+async function loadDetail(tk) {
+  if (details.has(tk)) return;
+  details.set(tk, "loading");
+  try { details.set(tk, await api(`/api/token?ticker=${encodeURIComponent(tk)}`)); }
+  catch (e) { details.set(tk, { error: e.message }); }
+  if (open === tk) $("#ins").innerHTML = insightHtml(tk);
+}
+
+function sparkline(closes) {
+  if (!closes || closes.length < 2) return "";
+  const w = 600, h = 56, min = Math.min(...closes), max = Math.max(...closes), r = max - min || 1;
+  const pts = closes.map((c, i) => `${(i / (closes.length - 1)) * w},${h - 4 - ((c - min) / r) * (h - 8)}`).join(" ");
+  const upTrend = closes[closes.length - 1] >= closes[0];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Price over ${closes.length} days">
+    <polyline points="${pts}" fill="none" stroke="var(${upTrend ? "--good" : "--bad"})" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+const li = (arr) => arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="empty">Nothing stands out.</p>`;
+
+function insightHtml(tk) {
+  const d = details.get(tk);
+  if (!d || d === "loading") return `<div class="skeleton" style="height:120px"></div>`;
+  if (d.error) return `<p class="err">Couldn't load this stock: ${esc(d.error)}</p>`;
+  const i = d.insight;
+  const pos = d.sharePrice != null && d.high52w > d.low52w ? Math.max(0, Math.min(1, (d.sharePrice - d.low52w) / (d.high52w - d.low52w))) : null;
+  const deeper = d.deeper;
+  return `
+    <div class="read"><span class="pill ${i.read.tone}">${esc(i.read.label)}</span><span class="empty">Kylo's quick read from live data</span></div>
+    ${d.description ? `<p class="about" data-about title="Tap to expand">${esc(d.description)}</p>` : ""}
+    ${sparkline(d.closes90d)}
+    <div class="stats">
+      <div class="stat"><small>Price / share</small><b>${money(d.sharePrice)}</b></div>
+      <div class="stat"><small>52-week range</small><b>${money(d.low52w, 0)} – ${money(d.high52w, 0)}</b>${pos != null ? `<div class="range"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
+      <div class="stat"><small>P/E</small><b>${d.pe != null ? d.pe.toFixed(1) : "–"}</b></div>
+      <div class="stat"><small>Dividend</small><b>${d.dividendYieldPct != null ? d.dividendYieldPct.toFixed(2) + "%" : "–"}</b></div>
+      <div class="stat"><small>Company size</small><b>${big(d.stockMarketCap)}</b></div>
+      <div class="stat"><small>On-chain liquidity</small><b>${big(d.onchainLiquidityUsd)}</b></div>
+      <div class="stat"><small>Token holders</small><b>${d.holders != null ? d.holders.toLocaleString() : "–"}</b></div>
+    </div>
+    <div class="cols">
+      <div class="yes"><h4>Reasons to consider</h4>${li(i.consider)}</div>
+      <div class="no"><h4>Reasons to hold off</h4>${li(i.holdOff)}</div>
+    </div>
+    ${i.token.length ? `<div class="cols tok" style="margin-top:10px"><div><h4>About holding the token</h4>${li(i.token)}</div></div>` : ""}
+    <div class="deeper">
+      ${deeper?.take ? deeperHtml(deeper) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written take? It reads the same live data and explains it in plain English.</p>`}
+      ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a deeper take · paid from your wallet"}</button>`}
+    </div>
+    <div class="foot">
+      <span>${esc(d.symbol)} · <a href="https://bscscan.com/token/${esc(d.contractAddress)}" target="_blank" rel="noopener">contract ↗</a></span>
+      ${d.attestation ? `<a href="${esc(d.attestation)}" target="_blank" rel="noopener">Monthly attestation report ↗</a>` : ""}
+      ${d.ceo ? `<span>CEO ${esc(d.ceo)}</span>` : ""}
     </div>`;
-  $("#replan").onclick = () => $("#plan").click();
+}
+function deeperHtml({ take, payment }) {
+  return `<p><b>Kylo's take</b>${payment ? ` <span class="empty">· paid ${esc(payment.amount)} ${esc(payment.token)}</span>` : ""}</p>
+    ${take.summary ? `<p>${esc(take.summary)}</p>` : ""}
+    <div class="cols"><div class="yes">${li(take.reasonsToConsider ?? [])}</div><div class="no">${li(take.reasonsToHoldOff ?? [])}</div></div>
+    ${take.tokenNotes?.length ? `<div class="tok" style="margin-top:6px">${li(take.tokenNotes)}</div>` : ""}
+    ${take.read ? `<p style="margin-top:8px"><i>${esc(take.read)}</i></p>` : ""}`;
+}
+async function askDeeper(tk) {
+  const d = details.get(tk); if (!d || d.deeper === "loading") return;
+  d.deeper = "loading"; $("#ins").innerHTML = insightHtml(tk);
+  try { d.deeper = await api("/api/take", { ticker: tk }); } catch (e) { d.deeper = { error: e.message }; }
+  if (open === tk) $("#ins").innerHTML = insightHtml(tk);
+}
+
+// ── basket tray ───────────────────────────────────────────────────────────
+function renderTray() {
+  $("#tray").classList.toggle("on", basket.size > 0);
+  $("#traytop").innerHTML = `<b>Basket · ${basket.size}</b>` + [...basket].map((t) => `<span class="tag">${esc(t)}<button data-rm="${esc(t)}" aria-label="Remove ${esc(t)}">×</button></span>`).join("");
+  const each = basket.size ? usd / basket.size : 0;
+  $("#plan").textContent = basket.size ? `Plan basket · ${money(usd, 0)} (${money(each)} each)` : "Plan basket";
+}
+$("#traytop").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; basket.delete(b.dataset.rm); render(); renderTray(); });
+$("#amt").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  usd = Number(b.dataset.usd); $("#custom").value = "";
+  document.querySelectorAll("#amt .chip").forEach((x) => x.setAttribute("aria-pressed", x === b)); renderTray();
+});
+$("#custom").addEventListener("input", (e) => { usd = Number(e.target.value) || 0; document.querySelectorAll("#amt .chip").forEach((x) => x.setAttribute("aria-pressed", "false")); renderTray(); });
+
+// ── plan → buy → receipt ──────────────────────────────────────────────────
+const sheet = (html) => { $("#sheetin").innerHTML = html; $("#sheet").classList.add("on"); };
+$("#sheet").addEventListener("click", (e) => { if (e.target.id === "sheet" || e.target.closest("[data-close]")) $("#sheet").classList.remove("on"); });
+
+$("#plan").addEventListener("click", async () => {
+  if (!(usd > 0)) return alert("Enter an amount first.");
+  const btn = $("#plan"); btn.disabled = true; btn.textContent = "Paying Kylo and planning…";
+  try {
+    plan = await api("/api/plan", { tickers: [...basket], usd, allowEarnings: $("#earnings").checked });
+    renderPlan(plan);
+  } catch (e) { sheet(`<h3>Couldn't plan the basket</h3><p class="err">${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Close</button></div>`); }
+  finally { btn.disabled = false; renderTray(); }
+});
+
+function renderPlan({ plan: p, payment, quotes }) {
+  const q = Object.fromEntries((quotes || []).map((x) => [x.ticker, x]));
+  const canBuy = p.legs.length > 0 && (quotes || []).every((x) => x.ok);
+  sheet(`
+    <h3>Your basket · ${money(p.totalUsd)} across ${p.legs.length} stocks</h3>
+    <p class="sub">${payment ? `Kylo fee paid: ${esc(payment.amount)} ${esc(payment.token)}` : "Kylo fee: free (local mode)"} · BNB Chain · plan valid 5 minutes</p>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Stock</th><th class="num">Amount</th><th class="num">Per share</th><th class="num">You get</th></tr></thead>
+      <tbody>${p.legs.map((l) => `<tr><td><b>${esc(l.ticker)}</b><br><code>${esc(l.symbol)}</code></td><td class="num">${money(l.usd)}</td>
+        <td class="num">${money(l.referenceSharePrice)}</td><td class="num">${q[l.ticker] ? (q[l.ticker].ok ? esc(q[l.ticker].to) : `<span class="fail">no quote</span>`) : "–"}</td></tr>`).join("") ||
+        `<tr><td colspan="4">None of these stocks can be bought right now.</td></tr>`}</tbody>
+    </table></div>
+    ${p.skipped.length ? `<ul class="skipped">${p.skipped.map((s) => `<li><b>${esc(s.ticker)}</b> left out: ${esc(s.reason)}</li>`).join("")}</ul>` : ""}
+    ${p.notes.map((n) => `<div class="note">${esc(n)}</div>`).join("")}
+    ${!canBuy && p.legs.length ? `<div class="note">Some quotes failed, so buying is off. Try planning again in a moment.</div>` : ""}
+    <div class="actions"><button class="btn" data-close>Not now</button>${canBuy ? `<button class="btn primary" id="buy">Buy basket · ${money(p.totalUsd)}</button>` : ""}</div>`);
   const buy = $("#buy");
   if (buy) buy.onclick = async () => {
     buy.disabled = true; buy.textContent = "Buying, confirming each order…";
-    try { renderReceipt(plan, (await api("/api/buy", { planId: current.planId })).results); }
-    catch (e) { showError(e.message); }
+    try { renderReceipt(p, (await api("/api/buy", { planId: plan.planId })).results); }
+    catch (e) { sheet(`<h3>Buy failed</h3><p class="err">${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Close</button></div>`); }
   };
 }
 
-function renderReceipt(plan, results) {
+function renderReceipt(p, results) {
   const done = results.filter((r) => r.status === "FINISHED");
-  const spent = done.reduce((s, r) => s + r.usd, 0);
-  const rows = results.map((r) => `
-    <tr>
-      <td><b>${esc(r.ticker)}</b></td>
-      <td class="num">$${r.usd.toFixed(2)}</td>
-      <td class="${r.status === "FINISHED" ? "ok" : "fail"}">${r.status === "FINISHED" ? "Bought" : r.status === "PENDING" ? "Still pending" : "Failed"}${r.status === "FINISHED" && r.received ? ` · ${esc(r.received)}` : ""}${r.error ? `<br><code>${esc(r.error)}</code>` : ""}</td>
-      <td>${r.txHash ? `<a href="https://bscscan.com/tx/${esc(r.txHash)}" target="_blank" rel="noopener">BscScan ↗</a>` : "–"}</td>
-    </tr>`).join("");
-  $("#out").innerHTML = `
-    <div class="card">
-      <h3>${done.length === results.length ? "Basket bought" : `${done.length} of ${results.length} bought`}</h3>
-      <p class="sub">${esc(plan.label)} · $${spent.toFixed(2)} spent · results are final order statuses, not submissions</p>
-      <div class="tableWrap"><table><thead><tr><th>Stock</th><th class="num">Amount</th><th>Result</th><th>Proof</th></tr></thead><tbody>${rows}</tbody></table></div>
-      <button class="go secondary" id="again">Build another basket</button>
-    </div>`;
-  $("#again").onclick = () => { $("#out").innerHTML = ""; window.scrollTo({ top: 0, behavior: "smooth" }); };
+  if (done.length) { done.forEach((r) => basket.delete(r.ticker)); render(); renderTray(); }
+  sheet(`
+    <h3>${done.length === results.length ? "Basket bought 🎉" : `${done.length} of ${results.length} bought`}</h3>
+    <p class="sub">${money(done.reduce((s, r) => s + r.usd, 0))} spent · these are final order results, not just submissions</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>Stock</th><th class="num">Amount</th><th>Result</th><th>Proof</th></tr></thead><tbody>
+      ${results.map((r) => `<tr><td><b>${esc(r.ticker)}</b></td><td class="num">${money(r.usd)}</td>
+        <td class="${r.status === "FINISHED" ? "ok" : "fail"}">${r.status === "FINISHED" ? `Bought${r.received ? ` · ${esc(r.received)}` : ""}` : r.status === "PENDING" ? "Still pending" : "Failed"}${r.error ? `<br><code>${esc(r.error)}</code>` : ""}</td>
+        <td>${r.txHash ? `<a href="https://bscscan.com/tx/${esc(r.txHash)}" target="_blank" rel="noopener">BscScan ↗</a>` : "–"}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="actions"><button class="btn primary" data-close>Done</button></div>`);
 }
+
+// ── boot ──────────────────────────────────────────────────────────────────
+api("/api/tokens").then(({ tokens: t, market }) => {
+  tokens = t;
+  if (market) { $("#market").textContent = market.openState ? "Market open" : "Market closed"; $("#market").className = `pill ${market.openState ? "good" : ""}`; }
+  render();
+}).catch((e) => { $("#list").innerHTML = `<p class="err">Couldn't load stocks: ${esc(e.message)}</p>`; });
+renderTray();
 </script>
 </body>
 </html>

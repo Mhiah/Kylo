@@ -11,13 +11,14 @@
 import { buyLegs, getPlan, quoteLegs } from "./lib.mjs";
 
 const args = parseArgs(process.argv.slice(2));
-if (!args.agent || !args.theme || !args.usd) {
-  console.error("usage: kylo-buy --agent <url> --theme <ai|semis|bigtech|energy|dividends> --usd <n> [--execute] [--slippage 1] [--max-legs 5] [--allow-earnings]");
+if (!args.agent || !(args.theme || args.tickers) || !args.usd) {
+  console.error("usage: kylo-buy --agent <url> (--theme <ai|semis|bigtech|energy|dividends> | --tickers NVDA,AAPL) --usd <n> [--execute] [--slippage 1] [--max-legs 5] [--allow-earnings]");
   process.exit(2);
 }
 
 const { plan, payment } = await getPlan(args.agent, {
   theme: args.theme,
+  tickers: args.tickers ? String(args.tickers).split(",") : undefined,
   usd: args.usd,
   maxLegs: args["max-legs"] ? Number(args["max-legs"]) : undefined,
   allowEarnings: args["allow-earnings"],

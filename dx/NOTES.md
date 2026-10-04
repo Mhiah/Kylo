@@ -17,3 +17,5 @@ Raw observations for the Developer Experience Report (25% of the score). The rep
 ## 2026-10-04 — one-tap app
 
 - Agentic Wallet is a CLI (`baw`), so a browser page cannot call it directly. The one-tap web app needs a small local server next to the signed-in CLI. A browser or WalletConnect-style SDK for Agentic Wallet would remove that step.
+- The RWA Dynamic API has no on-chain liquidity. You need a second API on a different host (`web3.binance.com` `.../token/dynamic/info/ai`) for liquidity and on-chain volume, and its kline lives on a third host (`dquery.sintral.io`) with a different candle format from the RWA kline.
+- `companyInfo.homepageUrl` can be an empty string rather than null.
