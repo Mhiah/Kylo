@@ -8,11 +8,13 @@
  * how Ondo stock tokens trade), or a normal transaction on a DEX route.
  */
 import { BSC, approveTx, buildSwap, quote, rfqStatus, simulate, submitRfq } from "./web3api.mjs";
-import { SECTORS, marketStatus, tokenList } from "./data.mjs";
+import { SECTORS, marketStatus, sectorSource, tokenList } from "./data.mjs";
 
 /** BSC-USD (USDT), 18 decimals: what every basket is paid in. */
 export const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955";
 const USDT_DECIMALS = 18;
+/** Binance's aggregator rejects orders under this ("Minimum order amount is 5 USD"). */
+export const MIN_LEG_USD = 5;
 const RPC = process.env.KYLO_BSC_RPC ?? "https://bsc-dataseed.bnbchain.org";
 
 export const isAddress = (a) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
@@ -74,8 +76,16 @@ export async function planBasket({ theme, tickers, usd, maxLegs, allowEarnings =
     if (reason) skipped.push({ ticker: tk, reason });
     else buyable.push(t);
   }
-  const chosen = buyable.slice(0, cap);
-  for (const t of buyable.slice(cap)) skipped.push({ ticker: t.ticker, reason: `over max stocks (${cap})` });
+  // Binance rejects orders under $5, so a small basket holds fewer stocks.
+  const fit = Math.min(cap, Math.floor(total / MIN_LEG_USD));
+  if (buyable.length && fit < 1) throw Object.assign(new Error(`the smallest basket is $${MIN_LEG_USD} (Binance's minimum order)`), { status: 400 });
+  const chosen = buyable.slice(0, fit);
+  const notes = [];
+  if (sector && buyable.length > chosen.length) {
+    notes.push(`Picked the ${chosen.length} biggest of ${buyable.length} buyable stocks in this theme${fit < cap ? ` (Binance's minimum is $${MIN_LEG_USD} per stock)` : ""}.`);
+  } else {
+    for (const t of buyable.slice(fit)) skipped.push({ ticker: t.ticker, reason: fit < cap ? `needs at least $${MIN_LEG_USD} per stock` : `over max stocks (${cap})` });
+  }
 
   let allocated = 0;
   const legs = chosen.map((t, i) => {
@@ -90,13 +100,12 @@ export async function planBasket({ theme, tickers, usd, maxLegs, allowEarnings =
   });
 
   const market = await marketStatus().catch(() => null);
-  const notes = [];
   if (market && !market.openState) {
     notes.push(`The tokenized-stock market is closed right now${market.nextOpenTime ? ` (opens ${new Date(market.nextOpenTime).toUTCString()})` : ""}, so orders may not fill until it reopens.`);
   }
   if (!legs.length) notes.push("None of these stocks can be bought right now.");
   return {
-    theme: sector?.id ?? "custom", label: sector?.label ?? "Your basket", source: sector ? `Binance sector tab ${sector.tabId}` : "hand-picked",
+    theme: sector?.id ?? "custom", label: sector?.label ?? "Your basket", source: sector ? (sectorSource.get(sector.id) === "kylo" ? "Kylo's list (Binance tab was empty)" : `Binance sector tab ${sector.tabId}`) : "hand-picked",
     chainId: BSC, fundingToken: USDT_BSC, totalUsd: allocated, legs, skipped, marketOpen: market?.openState ?? null, generatedAt: new Date().toISOString(), notes,
   };
 }
@@ -111,8 +120,10 @@ async function bestQuote(leg, wallet) {
 }
 
 export async function quoteLegs(plan, wallet) {
-  return Promise.all(plan.legs.map(async (leg) => {
-    try {
+  // One at a time: the API rate-limits bursts of quotes.
+  const out = [];
+  for (const leg of plan.legs) {
+    out.push(await (async () => { try {
       const r = await bestQuote(leg, wallet);
       return {
         ticker: leg.ticker, ok: true, vendor: r.vendorName, mode: r.executionMode,
@@ -121,8 +132,9 @@ export async function quoteLegs(plan, wallet) {
       };
     } catch (e) {
       return { ticker: leg.ticker, ok: false, error: String(e.message ?? e).slice(0, 200) };
-    }
-  }));
+    } })());
+  }
+  return out;
 }
 
 /** Typed data comes as JSON or hex-encoded JSON; anything else is a raw digest we can't hand to a wallet. */

@@ -14,17 +14,17 @@ export { BSC };
  * transparent and reproducible: same tab, same stocks.
  */
 export const SECTORS = [
-  { tabId: 4, id: "ai-chips", label: "AI chips" },
-  { tabId: 9, id: "mag7", label: "Magnificent 7" },
-  { tabId: 12, id: "tech", label: "Tech leaders" },
-  { tabId: 6, id: "energy", label: "Energy" },
-  { tabId: 13, id: "buffett", label: "Buffett picks" },
-  { tabId: 10, id: "crypto", label: "Crypto stocks" },
-  { tabId: 11, id: "etf", label: "ETFs" },
-  { tabId: 7, id: "metals", label: "Precious metals" },
-  { tabId: 5, id: "storage", label: "Storage" },
-  { tabId: 2, id: "space", label: "Space" },
-  { tabId: 8, id: "china", label: "China ADRs" },
+  { tabId: 4, id: "ai-chips", label: "AI chips", fallback: ["NVDA", "AMD", "AVGO", "TSM", "INTC", "QCOM", "MU", "ARM", "ASML", "MRVL"] },
+  { tabId: 9, id: "mag7", label: "Magnificent 7", fallback: ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"] },
+  { tabId: 12, id: "tech", label: "Tech leaders", fallback: ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "ORCL", "CRM", "ADBE", "NFLX"] },
+  { tabId: 6, id: "energy", label: "Energy", fallback: ["XOM", "CVX", "COP", "OXY", "SLB", "NEE"] },
+  { tabId: 13, id: "buffett", label: "Buffett picks", fallback: ["AAPL", "KO", "BAC", "AXP", "CVX", "OXY", "KHC", "MCO"] },
+  { tabId: 10, id: "crypto", label: "Crypto stocks", fallback: ["COIN", "MSTR", "HOOD", "CRCL", "IBIT", "MARA", "RIOT"] },
+  { tabId: 11, id: "etf", label: "ETFs", fallback: ["SPY", "QQQ", "IVV", "VOO", "IBIT", "GLD", "TLT"] },
+  { tabId: 7, id: "metals", label: "Precious metals", fallback: ["GLD", "SLV", "IAU"] },
+  { tabId: 5, id: "storage", label: "Storage", fallback: ["MU", "WDC", "STX", "SNDK"] },
+  { tabId: 2, id: "space", label: "Space", fallback: ["RKLB", "ASTS", "LUNR"] },
+  { tabId: 8, id: "china", label: "China ADRs", fallback: ["BABA", "PDD", "JD", "BIDU", "NIO"] },
 ];
 
 const cache = new Map(); // key → { at, value }
@@ -58,21 +58,28 @@ function shareRatio(r) {
 const baseList = () => cached("list", 5 * 60_000, async () =>
   (await rwaTokens()).filter((r) => r.binanceChainId === BSC && (r.assetType === 1 || r.assetType === 3)));
 
-/** ticker → [sector ids], from one RWA list call per Binance sector tab. */
+/**
+ * ticker → [sector ids], from one RWA list call per Binance sector tab.
+ * A tab whose answer is (nearly) the whole list means the filter wasn't
+ * applied, so that sector falls back to Kylo's own short list instead of
+ * putting every stock in every theme. `sectorSource` records which was used.
+ */
+export const sectorSource = new Map(); // sector id → "binance" | "kylo"
 const sectorMembers = () => cached("sectors", 30 * 60_000, async () => {
+  const all = await baseList();
   const out = new Map();
-  const lists = await Promise.allSettled(SECTORS.map((s) => rwaTokens(s.tabId)));
-  lists.forEach((res, i) => {
-    if (res.status !== "fulfilled") return;
-    for (const r of res.value ?? []) {
-      if (r.binanceChainId !== BSC) continue;
-      const k = r.underlyingTicker?.toUpperCase();
-      if (!k) continue;
-      out.set(k, [...(out.get(k) ?? []), SECTORS[i].id]);
-    }
-  });
+  const add = (ticker, id) => out.set(ticker, [...(out.get(ticker) ?? []), id]);
+  for (const s of SECTORS) {
+    const rows = await rwaTokens(s.tabId).catch(() => null);
+    const tickers = (rows ?? []).filter((r) => r.binanceChainId === BSC).map((r) => r.underlyingTicker?.toUpperCase()).filter(Boolean);
+    const filtered = tickers.length > 0 && tickers.length < all.length * 0.5;
+    sectorSource.set(s.id, filtered ? "binance" : "kylo");
+    for (const t of filtered ? tickers : s.fallback) add(t, s.id);
+  }
   return out;
 });
+
+export const sectorsInfo = () => SECTORS.map(({ id, label }) => ({ id, label, source: sectorSource.get(id) ?? null }));
 
 /** On-chain 24h change / liquidity / holders, best effort (batch of 100). */
 const onchain = (addresses) => cached(`onchain:${addresses.length}:${addresses[0] ?? ""}`, 60_000, async () => {

@@ -22,7 +22,7 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SECTORS, marketStatus, tokenDetail, tokenList } from "./data.mjs";
+import { marketStatus, sectorsInfo, tokenDetail, tokenList } from "./data.mjs";
 import { isAddress, orderStatus, planBasket, prepareLeg, quoteLegs, submitLeg, usdtBalance, formatUnits } from "./trade.mjs";
 import { hasKeys } from "./web3api.mjs";
 
@@ -47,9 +47,9 @@ function planEntry(planId, index) {
 
 const routes = {
   "GET /api/config": async () => ({
-    chainId: 56, chainHex: "0x38", dataSource: "Binance Web3 API", keys: hasKeys(), agent: Boolean(AGENT), sectors: SECTORS.map(({ id, label }) => ({ id, label })),
+    chainId: 56, chainHex: "0x38", dataSource: "Binance Web3 API", keys: hasKeys(), agent: Boolean(AGENT), sectors: sectorsInfo(),
   }),
-  "GET /api/tokens": async () => ({ tokens: await tokenList(), market: await marketStatus().catch(() => null) }),
+  "GET /api/tokens": async () => ({ tokens: await tokenList(), sectors: sectorsInfo(), market: await marketStatus().catch(() => null) }),
   "GET /api/token": async (_b, url) => tokenDetail(url.searchParams.get("ticker") ?? ""),
   "POST /api/take": async (body) => {
     if (!AGENT) throw httpError(503, "Kylo's agent isn't switched on yet");

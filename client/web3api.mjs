@@ -53,7 +53,39 @@ export class Web3ApiError extends Error {
   }
 }
 
-async function call(method, path, { query = {}, body } = {}) {
+// The API rate-limits bursts (HTTP 429), so calls go through a small queue:
+// at most 2 in flight, at least 150 ms apart, with backoff retries on 429.
+const MAX_IN_FLIGHT = 2, GAP_MS = 150;
+let inFlight = 0, lastStart = 0;
+const waiting = [];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function slot() {
+  while (inFlight >= MAX_IN_FLIGHT) await new Promise((r) => waiting.push(r));
+  inFlight++;
+  const wait = lastStart + GAP_MS - Date.now();
+  lastStart = Math.max(Date.now(), lastStart + GAP_MS);
+  if (wait > 0) await sleep(wait);
+}
+function release() {
+  inFlight--;
+  waiting.shift()?.();
+}
+
+async function call(method, path, opts = {}) {
+  for (let attempt = 0; ; attempt++) {
+    await slot();
+    try {
+      return await callOnce(method, path, opts);
+    } catch (e) {
+      if (!(e.status === 429 || /rate limit/i.test(e.message)) || attempt >= 3) throw e;
+    } finally {
+      release();
+    }
+    await sleep(800 * 2 ** attempt);
+  }
+}
+
+async function callOnce(method, path, { query = {}, body } = {}) {
   if (!hasKeys()) throw new Web3ApiError("Binance Web3 API keys are not set (KYLO_W3_API_KEY / KYLO_W3_API_SECRET)", { status: 503 });
   const qs = encodeQuery(query);
   const bodyStr = body === undefined ? "" : JSON.stringify(body);

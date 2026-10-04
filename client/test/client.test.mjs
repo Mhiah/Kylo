@@ -49,3 +49,8 @@ test("insight rules explain thin liquidity and paused trading", () => {
   assert.ok(i.holdOff.some((x) => /Thin on-chain liquidity/.test(x)));
   assert.ok(i.token.some((x) => /50 on-chain holders/.test(x)));
 });
+
+test("Binance's $5 minimum per order is a fixed constant", async () => {
+  const { MIN_LEG_USD } = await import("../trade.mjs");
+  assert.equal(MIN_LEG_USD, 5);
+});

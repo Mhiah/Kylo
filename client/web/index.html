@@ -169,8 +169,8 @@
   <div class="tray-top" id="traytop"></div>
   <div class="tray-bot">
     <div class="amt" id="amt">
-      <button class="chip" data-usd="10">$10</button><button class="chip" data-usd="25" aria-pressed="true">$25</button><button class="chip" data-usd="50">$50</button>
-      <input type="number" id="custom" min="1" step="1" placeholder="Other $" aria-label="Custom amount">
+      <button class="chip" data-usd="25" aria-pressed="true">$25</button><button class="chip" data-usd="50">$50</button><button class="chip" data-usd="100">$100</button>
+      <input type="number" id="custom" min="5" step="1" placeholder="Other $" aria-label="Custom amount">
     </div>
     <label class="opt"><input type="checkbox" id="earnings"> include earnings-week stocks</label>
     <button class="btn primary" id="plan">Plan basket</button>
@@ -257,7 +257,7 @@ function render() {
   $("#count").textContent = tokens.length ? `${list.length} of ${tokens.length} stocks` : "";
   const th = themes().find((x) => x.id === theme);
   $("#themebar").classList.toggle("on", theme !== "all" && list.length > 0);
-  $("#themetext").innerHTML = th && theme !== "all" ? `${esc(th.label)}: ${list.length} stocks <span class="src">· picked by Binance</span>` : "";
+  $("#themetext").innerHTML = th && theme !== "all" ? `${esc(th.label)}: ${list.length} stocks <span class="src">· ${th.source === "binance" ? "picked by Binance" : "picked by Kylo"}</span>` : "";
   if (!tokens.length) return;
   if (!list.length) { $("#list").innerHTML = `<p class="empty">No stock matches “${esc($("#q").value)}”. Try a company name or ticker.</p>`; return; }
   $("#list").innerHTML = list.map((t) => `
@@ -481,8 +481,9 @@ function renderReceipt(p, results) {
 
 // ── boot ──────────────────────────────────────────────────────────────────
 api("/api/config").then((c) => { config = c; renderThemes(); render(); }).catch(() => renderThemes());
-api("/api/tokens").then(({ tokens: t, market }) => {
+api("/api/tokens").then(({ tokens: t, sectors, market }) => {
   tokens = t;
+  if (sectors?.length) { config.sectors = sectors; renderThemes(); }
   if (market) { $("#market").textContent = market.openState ? "Market open" : "Market closed"; $("#market").className = `pill ${market.openState ? "good" : ""}`; }
   render();
 }).catch((e) => { $("#list").innerHTML = `<p class="err">Couldn't load stocks: ${esc(e.message)}</p>`; });
