@@ -13,3 +13,7 @@ Raw observations for the Developer Experience Report (25% of the score). The rep
 - `tokenInfo.price` is per token and not per share. You have to divide by `sharesMultiplier`, and multipliers drift with reinvested dividends.
 - The `binance-skills-hub` GitHub tree page is blocked by robots.txt for automated fetchers. `git clone` works.
 - Still the first session: the cloud container's egress proxy blocks `www.binance.com`, so live calls must run on a local machine.
+
+## 2026-10-04 — one-tap app
+
+- Agentic Wallet is a CLI (`baw`), so a browser page cannot call it directly. The one-tap web app needs a small local server next to the signed-in CLI. A browser or WalletConnect-style SDK for Agentic Wallet would remove that step.

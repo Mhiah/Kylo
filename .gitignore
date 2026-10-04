@@ -22,3 +22,4 @@ dist/
 
 # Skills installed at workspace root (regeneratable via `bag skills install`).
 .claude/skills/
+dx/calls.jsonl

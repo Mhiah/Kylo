@@ -24,7 +24,8 @@ you ── "put $50 into AI stocks" ──▶ Claude + Agentic Wallet skill (cli
 ```
 
 - **Agent Studio:** the seller agent in `app/agent/`, scaffolded with `bag init`. The basket logic lives in `src/stocks.ts`. JSON requests skip the LLM entirely, and free-text requests go through the LLM, which may only call `plan_basket`.
-- **Agentic Wallet / Wallet Skills:** `client/kylo-buy.mjs` pays the agent with `baw x402-payment` and buys each leg with `baw market-order`. `client/skills/kylo-basket/SKILL.md` lets Claude drive it from a sentence.
+- **One-tap app:** `client/server.mjs` + `client/web/index.html`. Pick a theme and an amount, tap **Plan my basket** (pays Kylo, shows legs, skipped stocks with reasons, and quotes), then tap **Buy basket**. The receipt shows each leg's final order status and a BscScan link.
+- **Agentic Wallet / Wallet Skills:** `client/lib.mjs` (shared by the app and `client/kylo-buy.mjs`) pays the agent with `baw x402-payment` and buys each leg with `baw market-order`. `client/skills/kylo-basket/SKILL.md` lets Claude drive it from a sentence.
 - **Binance Web3 API:** public RWA endpoints (token list, market status, per-asset status, dynamic price and multiplier), plus Agentic Wallet quotes and swaps.
 
 ## Run it
@@ -40,6 +41,11 @@ bag dev                                # local; set payments.seller.price_usd = 
 
 # buyer
 npm i -g @binance/agentic-wallet && baw auth signin
+
+# one-tap web app (runs on your machine next to the signed-in baw; binds to localhost only)
+KYLO_AGENT_URL=http://localhost:8080 node client/server.mjs   # open http://localhost:4402
+
+# or the CLI
 node client/kylo-buy.mjs --agent http://localhost:8080 --theme ai --usd 20             # quotes only
 node client/kylo-buy.mjs --agent http://localhost:8080 --theme ai --usd 20 --execute   # buys
 ```
