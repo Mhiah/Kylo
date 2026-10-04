@@ -13,8 +13,11 @@ import { SECTORS, marketStatus, sectorSource, tokenList } from "./data.mjs";
 /** BSC-USD (USDT), 18 decimals: what every basket is paid in. */
 export const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955";
 const USDT_DECIMALS = 18;
-/** Binance's aggregator rejects orders under this ("Minimum order amount is 5 USD"). */
-export const MIN_LEG_USD = 5;
+/**
+ * Smallest amount per stock. Binance says "Minimum order amount is 5 USD" but
+ * rejects exactly $5.00 too (fees seem to come off first), so keep a margin.
+ */
+export const MIN_LEG_USD = 6;
 const RPC = process.env.KYLO_BSC_RPC ?? "https://bsc-dataseed.bnbchain.org";
 
 export const isAddress = (a) => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a);
@@ -78,11 +81,11 @@ export async function planBasket({ theme, tickers, usd, maxLegs, allowEarnings =
   }
   // Binance rejects orders under $5, so a small basket holds fewer stocks.
   const fit = Math.min(cap, Math.floor(total / MIN_LEG_USD));
-  if (buyable.length && fit < 1) throw Object.assign(new Error(`the smallest basket is $${MIN_LEG_USD} (Binance's minimum order)`), { status: 400 });
+  if (buyable.length && fit < 1) throw Object.assign(new Error(`the smallest basket is $${MIN_LEG_USD} (Binance needs a bit over $5 per stock)`), { status: 400 });
   const chosen = buyable.slice(0, fit);
   const notes = [];
   if (sector && buyable.length > chosen.length) {
-    notes.push(`Picked the ${chosen.length} biggest of ${buyable.length} buyable stocks in this theme${fit < cap ? ` (Binance's minimum is $${MIN_LEG_USD} per stock)` : ""}.`);
+    notes.push(`Picked the ${chosen.length} biggest of ${buyable.length} buyable stocks in this theme${fit < cap ? ` (each stock needs at least $${MIN_LEG_USD})` : ""}.`);
   } else {
     for (const t of buyable.slice(fit)) skipped.push({ ticker: t.ticker, reason: fit < cap ? `needs at least $${MIN_LEG_USD} per stock` : `over max stocks (${cap})` });
   }
