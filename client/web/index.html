@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Kylo Baskets</title>
 <link rel="icon" href="data:,">
 <style>
@@ -12,12 +13,8 @@
     --good-bg: #e8f5ee; --bad-bg: #fdecea; --warn-bg: #fdf3e2; --muted-bg: #efefeb;
     --radius: 14px; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 24px rgba(0,0,0,.05);
   }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #0e0f12; --card: #17191e; --card2: #1c1f25; --ink: #eceef2; --muted: #9aa0ab; --line: #2a2d34;
-            --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
-            --good-bg: #12301f; --bad-bg: #3a1614; --warn-bg: #3a2a0c; --muted-bg: #23262d; --shadow: none; }
-  }
   * { box-sizing: border-box; }
+  html { color-scheme: light; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   button { font-family: inherit; }
   main { max-width: 860px; margin: 0 auto; padding: 20px 16px 160px; }
