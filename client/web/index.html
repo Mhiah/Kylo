@@ -17,7 +17,7 @@
   html { color-scheme: light; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   button { font-family: inherit; }
-  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 160px; }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 160px; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
   h1 span { color: var(--accent); }
@@ -46,7 +46,7 @@
 
   .list { display: flex; flex-direction: column; gap: 8px; }
   .row { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-  .row-main { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; align-items: center; padding: 12px 12px 12px 14px; cursor: pointer; }
+  .row-main { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; align-items: center; padding: 12px 12px 12px 14px; }
   .logo { width: 36px; height: 36px; border-radius: 50%; background: var(--muted-bg); display: grid; place-items: center;
           font-size: 11px; font-weight: 700; color: var(--muted); overflow: hidden; }
   .logo img { width: 100%; height: 100%; object-fit: cover; }
@@ -61,7 +61,10 @@
          color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
   .add[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .row-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 14px 10px 62px; margin-top: -4px; }
-  .more { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .more { margin-left: auto; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: none; border: 0; padding: 4px 0;
+          cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .more:hover { color: #000; text-decoration-color: var(--ink); }
+  @media (min-width: 1000px) { .list { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } .list > :not(.row) { grid-column: 1 / -1; } }
 
   #page { padding-top: 14px; }
   .back { background: none; border: 0; padding: 6px 0; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; }
@@ -107,7 +110,7 @@
   .tray { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--card); border-top: 1px solid var(--line);
           box-shadow: 0 -8px 30px rgba(0,0,0,.08); transform: translateY(110%); transition: transform .2s; }
   .tray.on { transform: none; }
-  .tray-in { max-width: 860px; margin: 0 auto; padding: 12px 16px 16px; }
+  .tray-in { max-width: 1280px; margin: 0 auto; padding: 12px 16px 16px; }
   .tray-top { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 10px; }
   .tray-top b { flex: none; }
   .tag { flex: none; display: inline-flex; gap: 6px; align-items: center; background: var(--muted-bg); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 13px; }
@@ -278,17 +281,17 @@ function render() {
   if (!list.length) { $("#list").innerHTML = `<p class="empty">No stock matches “${esc($("#q").value)}”. Try a company name or ticker.</p>`; return; }
   $("#list").innerHTML = list.map((t) => `
     <div class="row fade${seen.has(t.ticker) ? " in" : ""}" data-t="${esc(t.ticker)}">
-      <div class="row-main" data-act="toggle">
+      <div class="row-main">
         ${logo(t)}
         <div class="who"><b>${esc(t.ticker)}</b><div class="name">${esc(t.name)}</div></div>
         <div class="px"><div class="p">${money(t.sharePrice)}</div><div class="c">${chg(t.change24hPct)}</div></div>
         <button class="add" data-act="add" aria-pressed="${basket.has(t.ticker)}" aria-label="${basket.has(t.ticker) ? "Remove from" : "Add to"} basket" ${t.status.tone === "bad" ? "disabled title='Paused right now'" : ""}>${basket.has(t.ticker) ? "✓" : "+"}</button>
       </div>
-      <div class="row-sub" data-act="toggle">
+      <div class="row-sub">
         <span class="pill ${t.status.tone}">${esc(t.status.label)}</span>
         ${t.assetType === "ETF" ? `<span class="pill">ETF</span>` : ""}
         ${t.sectors.slice(0, 2).map((id) => `<span class="pill">${esc(config.sectors.find((s) => s.id === id)?.label ?? id)}</span>`).join("")}
-        <span class="more">Kylo's note →</span>
+        <button class="more" data-act="toggle">Kylo's note →</button>
       </div>
     </div>`).join("");
   reveal();
