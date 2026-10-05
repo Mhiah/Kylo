@@ -430,14 +430,13 @@ function insightHtml(tk) {
       ${d.ceo ? `<span>CEO ${esc(d.ceo)}</span>` : ""}
     </div>`;
 }
-// Binance's copies of Ondo's attestation PDFs are refused (HTTP 403) and its host is
-// blocked in some countries, so link Ondo's own asset page, which lists the reports.
+// Binance lists Ondo's daily and monthly attestation PDFs, but its copies return 403
+// and Ondo's own site is closed to many countries, so state the fact without a dead link.
 function protectionLinks(d) {
   const ps = d.protections ?? [];
   const other = ps.filter((p) => !/bnbstatic\.com\//i.test(p.url ?? ""));
-  const ondo = ps.length > other.length && d.symbol
-    ? `<a href="https://app.ondo.finance/assets/${encodeURIComponent(d.symbol.toLowerCase())}" target="_blank" rel="noopener">Daily & monthly reports (Ondo) ↗</a>` : "";
-  return ondo + other.map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("");
+  const attested = ps.length > other.length ? `<span>Holdings checked daily & monthly by an independent firm (Ondo attestation)</span>` : "";
+  return attested + other.map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("");
 }
 function deeperHtml(take) {
   return `<p><b>Kylo's note</b></p>
