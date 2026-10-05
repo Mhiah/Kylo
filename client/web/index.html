@@ -18,23 +18,35 @@
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   button { font-family: inherit; }
   main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 160px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
-  h1 span { color: var(--accent); }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 34px; }
+  .mini { font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.03em; color: inherit; text-decoration: none; visibility: hidden; }
+  .on-page .mini { visibility: visible; }
+  .mini span, .hero h1 span { color: var(--accent); }
+  .hero { text-align: center; padding: 28px 0 6px; }
+  .hero h1 { font-size: clamp(52px, 9vw, 88px); font-weight: 900; margin: 0; letter-spacing: -0.05em; line-height: 1; }
+  /* Kylo entrance: letters rise in one by one, then the dot drops in */
+  .hero h1 i { display: inline-block; font-style: normal; opacity: 0; transform: translateY(.45em) rotate(-6deg); animation: rise .7s cubic-bezier(.2,.8,.2,1) forwards; animation-delay: calc(var(--n) * 90ms); }
+  .hero h1 span { display: inline-block; opacity: 0; transform: translateY(-1.2em); animation: drop .55s cubic-bezier(.3,1.6,.5,1) .5s forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @keyframes drop { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .hero h1 i, .hero h1 span { animation: none; opacity: 1; transform: none; } }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .pill { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--muted-bg); color: var(--muted); white-space: nowrap; }
   .pill.good { background: var(--good-bg); color: var(--good); }
   .pill.bad { background: var(--bad-bg); color: var(--bad); }
   .pill.warn { background: var(--warn-bg); color: var(--warn); }
-  p.lead { color: var(--muted); margin: 6px 0 16px; }
+  p.lead { color: var(--muted); margin: 14px auto 20px; max-width: 560px; text-align: center; font-size: 16px; }
 
   .toolbar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 0 8px; }
-  .search { display: flex; gap: 8px; }
+  .search { display: flex; gap: 8px; max-width: 640px; margin: 0 auto; }
   .search input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line);
                   background: var(--card); color: inherit; font: inherit; }
   .search input:focus { outline: none; border-color: var(--accent); }
-  .search select { padding: 0 10px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: inherit; font: inherit; }
-  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; }
+  .search select { flex: none; appearance: none; -webkit-appearance: none; padding: 0 38px 0 14px; border-radius: 12px; border: 1.5px solid var(--line);
+                   background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2315171c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center;
+                   color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+  .search select:focus { outline: none; border-color: var(--accent); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 2px; scrollbar-width: none; justify-content: safe center; }
   .chip { flex: none; background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 13px;
           cursor: pointer; color: inherit; font-size: 14px; }
   .chip[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
@@ -62,8 +74,8 @@
   .add[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .row-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 14px 10px 62px; margin-top: -4px; }
   .more { margin-left: auto; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: none; border: 0; padding: 4px 0;
-          cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
-  .more:hover { color: #000; text-decoration-color: var(--ink); }
+          cursor: pointer; }
+  .more:hover { text-decoration: underline; text-underline-offset: 3px; }
   @media (min-width: 1000px) { .list { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } .list > :not(.row) { grid-column: 1 / -1; } }
 
   #page { padding-top: 14px; }
@@ -154,16 +166,17 @@
 </head>
 <body>
 <main>
-  <header class="fade">
-    <h1>Kylo<span>.</span></h1>
+  <header>
+    <a class="mini" href="#" aria-label="Kylo home">Kylo<span>.</span></a>
     <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
   <div id="home">
-  <p class="lead fade" style="transition-delay:.08s">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
+  <div class="hero"><h1 aria-label="Kylo"><i style="--n:0">K</i><i style="--n:1">y</i><i style="--n:2">l</i><i style="--n:3">o</i><span>.</span></h1></div>
+  <p class="lead fade" style="transition-delay:.55s">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
 
-  <div class="toolbar fade" style="transition-delay:.16s">
+  <div class="toolbar fade" style="transition-delay:.7s">
     <div class="search">
-      <input id="q" type="search" placeholder="Search a company, ticker or theme (Apple, NVDA, cloud…)" autocomplete="off">
+      <input id="q" type="search" placeholder="Search a stock or theme" autocomplete="off">
       <select id="sort" aria-label="Sort">
         <option value="cap">Biggest</option>
         <option value="up">Top gainers</option>
@@ -310,7 +323,7 @@ function reveal() {
   io?.disconnect();
   document.querySelectorAll("#list .row.fade:not(.in)").forEach((r) => io ? io.observe(r) : r.classList.add("in"));
 }
-requestAnimationFrame(() => document.querySelectorAll("header.fade, .lead.fade, .toolbar.fade").forEach((el) => el.classList.add("in")));
+requestAnimationFrame(() => document.querySelectorAll(".lead.fade, .toolbar.fade").forEach((el) => el.classList.add("in")));
 $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const tk = row.dataset.t;
@@ -326,6 +339,7 @@ function route() {
   const tk = m ? decodeURIComponent(m[1]).toUpperCase() : null;
   open = tk;
   $("#home").hidden = Boolean(tk);
+  document.body.classList.toggle("on-page", Boolean(tk));
   $("#page").hidden = !tk;
   if (!tk) { $("#page").innerHTML = ""; document.title = "Kylo Baskets"; render(); requestAnimationFrame(() => window.scrollTo(0, homeScroll)); return; }
   renderPage(tk);
