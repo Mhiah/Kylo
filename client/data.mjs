@@ -44,7 +44,11 @@ export function shareStatus(s) {
   if (s.reasonCode === "ASSET_PAUSED") return { label: `Paused · ${s.reasonMsg ?? "corporate action"}`, tone: "bad" };
   if (s.reasonCode === "ASSET_LIMITED") return { label: /earning/i.test(s.reasonMsg ?? "") ? "Earnings" : "Limited", tone: "warn" };
   if (s.reasonCode === "MARKET_MAINTENANCE") return { label: "Maintenance", tone: "bad" };
-  if (s.openState) return { label: s.marketStatus === "regular" ? "Open" : `Open · ${s.marketStatus}`, tone: "good" };
+  if (s.openState) {
+    // Binance's session names → plain words (US market hours are 9:30am–4pm New York time)
+    const session = { premarket: "before hours", postmarket: "after hours", overnight: "overnight" }[String(s.marketStatus).toLowerCase()];
+    return { label: s.marketStatus === "regular" || !s.marketStatus ? "Open" : `Open · ${session ?? s.marketStatus}`, tone: "good" };
+  }
   return { label: "Closed", tone: "muted" };
 }
 
