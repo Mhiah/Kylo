@@ -419,7 +419,7 @@ function insightHtml(tk) {
       <div class="yes"><h4>Reasons to consider</h4>${li(i.consider)}</div>
       <div class="no"><h4>Reasons to hold off</h4>${li(i.holdOff)}</div>
     </div>
-    ${i.token.length ? `<div class="cols tok" style="margin-top:10px"><div><h4>About holding the token</h4>${li(i.token)}</div></div>` : ""}
+    ${i.token.length ? `<div class="cols tok" style="margin-top:10px"><div><h4>Holding the token</h4>${li(i.token)}</div></div>` : ""}
     ${config.agent ? `<div class="deeper">
       ${deeper?.take ? deeperHtml(deeper.take) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written note? Kylo's AI agent reads the same live data and explains it in plain English.</p>`}
       ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a written note"}</button>`}
