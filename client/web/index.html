@@ -63,6 +63,17 @@
   .row-sub { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 14px 10px 62px; margin-top: -4px; }
   .more { margin-left: auto; font-size: 13px; color: var(--muted); }
 
+  #page { padding-top: 14px; }
+  .back { background: none; border: 0; padding: 6px 0; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; }
+  .back:hover { color: var(--ink); }
+  .stock-head { display: grid; grid-template-columns: 48px 1fr auto; gap: 14px; align-items: center; margin: 10px 0 16px; }
+  .stock-head .logo { width: 48px; height: 48px; font-size: 13px; }
+  .stock-head h2 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+  .stock-head .name { color: var(--muted); font-size: 14px; }
+  .stock-head .px .p { font-size: 20px; }
+  .page-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .page-card .insight { border-top: 0; border-radius: var(--radius); background: var(--card); }
+  .page-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
   .insight { border-top: 1px solid var(--line); padding: 16px; background: var(--card2); border-radius: 0 0 var(--radius) var(--radius); }
   .read { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .read .pill { font-size: 13px; font-weight: 600; padding: 4px 11px; }
@@ -144,6 +155,7 @@
     <h1>Kylo<span>.</span></h1>
     <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
+  <div id="home">
   <p class="lead fade" style="transition-delay:.08s">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
 
   <div class="toolbar fade" style="transition-delay:.16s">
@@ -165,6 +177,8 @@
     <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
   </div>
   <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's note is built from that live data and simple, visible rules. It isn't investment advice, and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet, and you can say no to any of them.</p>
+  </div>
+  <section id="page" hidden></section>
 </main>
 
 <div class="tray" id="tray"><div class="tray-in">
@@ -274,9 +288,8 @@ function render() {
         <span class="pill ${t.status.tone}">${esc(t.status.label)}</span>
         ${t.assetType === "ETF" ? `<span class="pill">ETF</span>` : ""}
         ${t.sectors.slice(0, 2).map((id) => `<span class="pill">${esc(config.sectors.find((s) => s.id === id)?.label ?? id)}</span>`).join("")}
-        <span class="more">${open === t.ticker ? "Hide Kylo's note ▲" : "Kylo's note ▼"}</span>
+        <span class="more">Kylo's note →</span>
       </div>
-      ${open === t.ticker ? `<div class="insight" id="ins">${insightHtml(t.ticker)}</div>` : ""}
     </div>`).join("");
   reveal();
 }
@@ -298,12 +311,48 @@ requestAnimationFrame(() => document.querySelectorAll("header.fade, .lead.fade, 
 $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const tk = row.dataset.t;
-  if (e.target.closest("[data-deeper]")) return askDeeper(tk);
-  if (e.target.closest("[data-about]")) return e.target.closest("[data-about]").classList.toggle("open");
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "add") { basket.has(tk) ? basket.delete(tk) : basket.add(tk); render(); renderTray(); return; }
-  if (act === "toggle") { open = open === tk ? null : tk; render(); if (open) loadDetail(tk); }
+  if (act === "toggle") { homeScroll = window.scrollY; fromList = true; location.hash = `#/stock/${encodeURIComponent(tk)}`; }
 });
+
+// ── stock page (Kylo's note) ──────────────────────────────────────────────
+let homeScroll = 0, fromList = false; // fromList: browser Back returns to the list
+function route() {
+  const m = location.hash.match(/^#\/stock\/([^/?#]+)/);
+  const tk = m ? decodeURIComponent(m[1]).toUpperCase() : null;
+  open = tk;
+  $("#home").hidden = Boolean(tk);
+  $("#page").hidden = !tk;
+  if (!tk) { $("#page").innerHTML = ""; document.title = "Kylo Baskets"; render(); requestAnimationFrame(() => window.scrollTo(0, homeScroll)); return; }
+  renderPage(tk);
+  window.scrollTo(0, 0);
+  loadDetail(tk);
+}
+function renderPage(tk) {
+  const t = tokens.find((x) => x.ticker === tk);
+  document.title = t ? `${t.ticker} · Kylo's note` : "Kylo Baskets";
+  $("#page").innerHTML = `
+    <button class="back" data-back>← All stocks</button>
+    ${t ? `<div class="stock-head">
+      ${logo(t)}
+      <div><h2>${esc(t.ticker)}</h2><div class="name">${esc(t.name)}</div></div>
+      <div class="px"><div class="p">${money(t.sharePrice)}</div><div class="c">${chg(t.change24hPct)}</div></div>
+    </div>
+    <div class="page-actions">
+      <button class="btn ${basket.has(tk) ? "" : "primary"}" data-page-add ${t.status.tone === "bad" ? "disabled title='Paused right now'" : ""}>${basket.has(tk) ? "✓ In your basket" : "+ Add to basket"}</button>
+      <span class="pill ${t.status.tone}" style="align-self:center">${esc(t.status.label)}</span>
+    </div>` : tokens.length ? `<p class="err">Kylo doesn't have a stock called “${esc(tk)}”.</p>` : ""}
+    <div class="page-card"><div class="insight" id="ins">${insightHtml(tk)}</div></div>`;
+}
+$("#page").addEventListener("click", (e) => {
+  const tk = open; if (!tk) return;
+  if (e.target.closest("[data-back]")) { fromList ? history.back() : (location.hash = ""); fromList = false; return; }
+  if (e.target.closest("[data-deeper]")) return askDeeper(tk);
+  if (e.target.closest("[data-about]")) return e.target.closest("[data-about]").classList.toggle("open");
+  if (e.target.closest("[data-page-add]")) { basket.has(tk) ? basket.delete(tk) : basket.add(tk); renderPage(tk); renderTray(); }
+});
+window.addEventListener("hashchange", route);
 
 async function loadDetail(tk) {
   if (details.has(tk)) return;
@@ -504,9 +553,11 @@ api("/api/tokens").then(({ tokens: t, sectors, market }) => {
   if (sectors?.length) { config.sectors = sectors; renderThemes(); }
   if (market) { $("#market").textContent = market.openState ? "Market open" : "Market closed"; $("#market").className = `pill ${market.openState ? "good" : ""}`; }
   render();
+  if (open) renderPage(open);
 }).catch((e) => { $("#list").innerHTML = `<p class="err">Couldn't load stocks: ${esc(e.message)}</p>`; });
 showWallet();
 renderTray();
+route();
 </script>
 </body>
 </html>
