@@ -279,8 +279,12 @@ async function deeperTake(
       'looks now", "reasonsToConsider": ["..."], "reasonsToHoldOff": ["..."], ' +
       '"tokenNotes": ["anything specific to holding the token rather than the ' +
       'share: trading status, multiplier, market hours"], "read": "one short ' +
-      'balanced sentence"}. 2-4 items per list, each under 20 words. No price ' +
-      "targets, no instructions to buy or sell.",
+      'balanced sentence"}. 2-4 items per list, each under 20 words. Write ' +
+      "numbers as digits ($241, 29.3, 0.12%), never in words. The token gives " +
+      "economic exposure to the share through Ondo; it is NOT direct ownership " +
+      "of the company and has no voting rights, so never say otherwise. Skip " +
+      "filler: every item must say something specific about this stock. No " +
+      "price targets, no instructions to buy or sell.",
     prompt: JSON.stringify(snapshot),
     abortSignal,
   });
