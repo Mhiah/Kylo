@@ -245,6 +245,8 @@ export function insightFor(f) {
   }
   if (f.holders !== null && f.holders < 100) token.push(`Only ${f.holders} on-chain holders so far.`);
   if (f.sharesPerToken && Math.abs(f.sharesPerToken - 1) > 0.001) token.push(`One token = ${f.sharesPerToken.toFixed(4)} shares (dividends and splits are built in).`);
+  else token.push(`One token tracks one ${f.assetType === "ETF" ? "unit of the fund" : "share"}, held for token holders by Ondo.`);
+  token.push("It sits in your own wallet on BNB Chain, so you don't need a US broker to hold it.");
 
   const score = consider.length - holdOff.length;
   const blocked = s?.reasonCode === "ASSET_PAUSED";
