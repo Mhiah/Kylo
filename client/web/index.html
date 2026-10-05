@@ -131,17 +131,22 @@
   .btnpill { border: 0; cursor: pointer; font: inherit; font-size: 12px; }
   .btnpill.good { background: var(--good-bg); color: var(--good); }
   .src { font-size: 12px; color: var(--muted); }
+
+  /* Fade-in: the top of the page on load, each stock row as it scrolls into view */
+  .fade { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+  .fade.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .fade { opacity: 1; transform: none; transition: none; } }
 </style>
 </head>
 <body>
 <main>
-  <header>
+  <header class="fade">
     <h1>Kylo<span>.</span></h1>
     <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
-  <p class="lead">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
+  <p class="lead fade" style="transition-delay:.08s">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
 
-  <div class="toolbar">
+  <div class="toolbar fade" style="transition-delay:.16s">
     <div class="search">
       <input id="q" type="search" placeholder="Search a company, ticker or theme (Apple, NVDA, cloud…)" autocomplete="off">
       <select id="sort" aria-label="Sort">
@@ -258,7 +263,7 @@ function render() {
   if (!tokens.length) return;
   if (!list.length) { $("#list").innerHTML = `<p class="empty">No stock matches “${esc($("#q").value)}”. Try a company name or ticker.</p>`; return; }
   $("#list").innerHTML = list.map((t) => `
-    <div class="row" data-t="${esc(t.ticker)}">
+    <div class="row fade${seen.has(t.ticker) ? " in" : ""}" data-t="${esc(t.ticker)}">
       <div class="row-main" data-act="toggle">
         ${logo(t)}
         <div class="who"><b>${esc(t.ticker)}</b><div class="name">${esc(t.name)}</div></div>
@@ -273,7 +278,23 @@ function render() {
       </div>
       ${open === t.ticker ? `<div class="insight" id="ins">${insightHtml(t.ticker)}</div>` : ""}
     </div>`).join("");
+  reveal();
 }
+// Rows fade in once, the first time they scroll into view; a re-render (search, add) doesn't replay it.
+const seen = new Set();
+const io = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+  entries.filter((e) => e.isIntersecting).forEach((e, k) => {
+    e.target.style.transitionDelay = `${Math.min(k, 8) * 40}ms`;
+    e.target.classList.add("in");
+    seen.add(e.target.dataset.t);
+    io.unobserve(e.target);
+  });
+}, { rootMargin: "0px 0px -6% 0px" }) : null;
+function reveal() {
+  io?.disconnect();
+  document.querySelectorAll("#list .row.fade:not(.in)").forEach((r) => io ? io.observe(r) : r.classList.add("in"));
+}
+requestAnimationFrame(() => document.querySelectorAll("header.fade, .lead.fade, .toolbar.fade").forEach((el) => el.classList.add("in")));
 $("#list").addEventListener("click", (e) => {
   const row = e.target.closest(".row"); if (!row) return;
   const tk = row.dataset.t;
