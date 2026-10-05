@@ -426,12 +426,19 @@ function insightHtml(tk) {
     </div>` : ""}
     <div class="foot">
       <span>${esc(d.symbol)} · <a href="https://bscscan.com/token/${esc(d.contractAddress)}" target="_blank" rel="noopener">contract ↗</a></span>
-      ${(d.protections ?? []).map((p) => `<a href="${esc(docUrl(p.url))}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("")}
+      ${protectionLinks(d)}
       ${d.ceo ? `<span>CEO ${esc(d.ceo)}</span>` : ""}
     </div>`;
 }
-// Binance hosts the attestation PDFs on a domain some ISPs block, so open them through Kylo's server.
-const docUrl = (u) => /^https:\/\/[a-z0-9.-]*bnbstatic\.com\//i.test(u ?? "") ? `/api/doc?u=${encodeURIComponent(u)}` : u;
+// Binance's copies of Ondo's attestation PDFs are refused (HTTP 403) and its host is
+// blocked in some countries, so link Ondo's own asset page, which lists the reports.
+function protectionLinks(d) {
+  const ps = d.protections ?? [];
+  const other = ps.filter((p) => !/bnbstatic\.com\//i.test(p.url ?? ""));
+  const ondo = ps.length > other.length && d.symbol
+    ? `<a href="https://app.ondo.finance/assets/${encodeURIComponent(d.symbol.toLowerCase())}" target="_blank" rel="noopener">Daily & monthly reports (Ondo) ↗</a>` : "";
+  return ondo + other.map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("");
+}
 function deeperHtml(take) {
   return `<p><b>Kylo's note</b></p>
     ${take.summary ? `<p>${esc(take.summary)}</p>` : ""}
