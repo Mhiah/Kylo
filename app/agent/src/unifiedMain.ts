@@ -284,12 +284,41 @@ async function deeperTake(
     prompt: JSON.stringify(snapshot),
     abortSignal,
   });
-  const text = result.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-  try {
-    return JSON.stringify({ ticker, ...JSON.parse(text) });
-  } catch {
-    return JSON.stringify({ ticker, summary: text });
+  const note = extractNote(result.text);
+  if (note) return JSON.stringify({ ticker, ...note });
+  return JSON.stringify({ ticker, error: "Kylo couldn't write a note this time. Please try again." });
+}
+
+/**
+ * The note object from a model reply. Free reasoning models write their
+ * thinking ("Thinking Process: ...", or <think>...</think>) before the JSON,
+ * so take the last balanced {...} block that parses and has a summary.
+ */
+export function extractNote(raw: string): Record<string, unknown> | null {
+  const text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const blocks: string[] = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"' && depth > 0) inStr = true;
+    else if (c === "{") { if (depth++ === 0) start = i; }
+    else if (c === "}" && depth > 0 && --depth === 0) blocks.push(text.slice(start, i + 1));
   }
+  for (const b of blocks.reverse()) {
+    try {
+      const v = JSON.parse(b) as Record<string, unknown>;
+      if (v && typeof v === "object" && typeof v.summary === "string") return v;
+    } catch {
+      // not JSON (e.g. braces in the model's thinking): try the previous block
+    }
+  }
+  return null;
 }
 
 /** A JSON basket request (`{"theme":"ai","usd":50}`), or null for free text. */

@@ -56,7 +56,9 @@ const routes = {
     if (!body.ticker) throw httpError(400, "ticker is required");
     const facts = await tokenDetail(body.ticker);
     delete facts.closes90d; // keep the prompt small; the rules already summarise the trend
-    return { take: await askAgent({ action: "insight", ticker: facts.ticker, facts }) };
+    const take = await askAgent({ action: "insight", ticker: facts.ticker, facts });
+    if (take?.error) throw httpError(502, take.error);
+    return { take };
   },
   "POST /api/plan": async (body) => {
     const { theme, tickers, usd, maxLegs, allowEarnings } = body;
@@ -95,7 +97,7 @@ async function askAgent(promptObj) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt: JSON.stringify(promptObj) }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(120_000), // the free model can take a minute
   });
   const text = await res.text();
   if (!res.ok) throw httpError(502, `Kylo's agent answered ${res.status}`);
