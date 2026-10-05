@@ -115,6 +115,7 @@ createServer(async (req, res) => {
     }
     if (url.pathname === "/healthz") return send(res, 200, "ok");
     if (url.pathname === "/api/logo" && req.method === "GET") return sendLogo(res, url.searchParams.get("u"));
+    if (url.pathname === "/api/doc" && req.method === "GET") return sendDoc(res, url.searchParams.get("u"));
     if (req.method !== "GET") return send(res, 405, "method not allowed");
     const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     if (file.includes("..")) return send(res, 400, "bad path");
@@ -153,6 +154,22 @@ async function sendLogo(res, raw) {
   }
   res.writeHead(200, { "Content-Type": hit.type, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff" });
   res.end(hit.body);
+}
+
+// Ondo's attestation reports (PDFs) sit on the same blocked Binance host.
+const DOC_MAX_BYTES = 15 * 1024 * 1024;
+async function sendDoc(res, raw) {
+  let u;
+  try { u = new URL(String(raw ?? "")); } catch { return send(res, 400, "bad document url"); }
+  if (u.protocol !== "https:" || !LOGO_HOSTS.has(u.hostname) || !/\.pdf$/i.test(u.pathname)) return send(res, 400, "document not allowed");
+  const r = await fetch(u.href, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+  if (!r?.ok) return send(res, 404, "Binance didn't return this report. Try again later.");
+  const body = Buffer.from(await r.arrayBuffer());
+  if (body.length > DOC_MAX_BYTES || body.toString("latin1", 0, 5) !== "%PDF-") return send(res, 404, "this report isn't a PDF");
+  const name = u.pathname.split("/").pop().replace(/[^\w.-]/g, "");
+  res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${name}"`,
+    "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff" });
+  res.end(body);
 }
 
 function imageType(b) {

@@ -122,7 +122,12 @@
   .tray { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--card); border-top: 1px solid var(--line);
           box-shadow: 0 -8px 30px rgba(0,0,0,.08); transform: translateY(110%); transition: transform .2s; }
   .tray.on { transform: none; }
-  .tray-in { max-width: 1280px; margin: 0 auto; padding: 12px 16px 16px; }
+  .tray-in { max-width: 1280px; margin: 0 auto; padding: 12px 16px 16px; position: relative; }
+  .tray-top { padding-right: 44px; }
+  .trayclose { position: absolute; top: 8px; right: 12px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--line);
+               background: var(--card); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+  .trayclose:hover { background: var(--muted-bg); }
+  .basketpill { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
   .tray-top { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 10px; }
   .tray-top b { flex: none; }
   .tag { flex: none; display: inline-flex; gap: 6px; align-items: center; background: var(--muted-bg); border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 13px; }
@@ -168,7 +173,7 @@
 <main>
   <header>
     <a class="mini" href="#" aria-label="Kylo home">Kylo<span>.</span></a>
-    <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
+    <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill basketpill" id="basketpill" hidden>Basket</button><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
   <div id="home">
   <div class="hero"><h1 aria-label="Kylo"><i style="--n:0">K</i><i style="--n:1">y</i><i style="--n:2">l</i><i style="--n:3">o</i><span>.</span></h1></div>
@@ -198,6 +203,7 @@
 </main>
 
 <div class="tray" id="tray"><div class="tray-in">
+  <button class="trayclose" id="trayclose" aria-label="Close basket">×</button>
   <div class="tray-top" id="traytop"></div>
   <div class="tray-bot">
     <div class="amt" id="amt">
@@ -420,10 +426,12 @@ function insightHtml(tk) {
     </div>` : ""}
     <div class="foot">
       <span>${esc(d.symbol)} · <a href="https://bscscan.com/token/${esc(d.contractAddress)}" target="_blank" rel="noopener">contract ↗</a></span>
-      ${(d.protections ?? []).map((p) => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("")}
+      ${(d.protections ?? []).map((p) => `<a href="${esc(docUrl(p.url))}" target="_blank" rel="noopener">${esc(p.name)} ↗</a>`).join("")}
       ${d.ceo ? `<span>CEO ${esc(d.ceo)}</span>` : ""}
     </div>`;
 }
+// Binance hosts the attestation PDFs on a domain some ISPs block, so open them through Kylo's server.
+const docUrl = (u) => /^https:\/\/[a-z0-9.-]*bnbstatic\.com\//i.test(u ?? "") ? `/api/doc?u=${encodeURIComponent(u)}` : u;
 function deeperHtml(take) {
   return `<p><b>Kylo's note</b></p>
     ${take.summary ? `<p>${esc(take.summary)}</p>` : ""}
@@ -439,12 +447,19 @@ async function askDeeper(tk) {
 }
 
 // ── basket tray ───────────────────────────────────────────────────────────
+let trayClosed = false, traySize = 0; // × hides the tray; adding a stock or tapping the Basket pill brings it back
 function renderTray() {
-  $("#tray").classList.toggle("on", basket.size > 0);
+  if (basket.size > traySize) trayClosed = false;
+  traySize = basket.size;
+  $("#tray").classList.toggle("on", basket.size > 0 && !trayClosed);
+  $("#basketpill").hidden = !(basket.size > 0 && trayClosed);
+  $("#basketpill").textContent = `Basket · ${basket.size}`;
   $("#traytop").innerHTML = `<b>Basket · ${basket.size}</b>` + [...basket].map((t) => `<span class="tag">${esc(t)}<button data-rm="${esc(t)}" aria-label="Remove ${esc(t)}">×</button></span>`).join("");
   const each = basket.size ? usd / basket.size : 0;
   $("#plan").textContent = basket.size ? `Plan basket · ${money(usd, 0)} (${money(each)} each)` : "Plan basket";
 }
+$("#trayclose").addEventListener("click", () => { trayClosed = true; renderTray(); });
+$("#basketpill").addEventListener("click", () => { trayClosed = false; renderTray(); });
 $("#traytop").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; basket.delete(b.dataset.rm); render(); renderTray(); });
 $("#amt").addEventListener("click", (e) => {
   const b = e.target.closest(".chip"); if (!b) return;
