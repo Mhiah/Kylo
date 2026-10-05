@@ -282,7 +282,7 @@ function visible() {
 
 // ── token list ────────────────────────────────────────────────────────────
 function logo(t) {
-  return `<div class="logo">${t.icon ? `<img src="${esc(t.icon)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(t.ticker.slice(0, 4))}</div>`;
+  return `<div class="logo">${t.icon ? `<img src="/api/logo?u=${encodeURIComponent(t.icon)}" alt="" loading="lazy" onerror="this.remove()">` : ""}${esc(t.ticker.slice(0, 4))}</div>`;
 }
 function render() {
   const list = visible();

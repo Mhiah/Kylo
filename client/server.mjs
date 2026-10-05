@@ -114,6 +114,7 @@ createServer(async (req, res) => {
       return send(res, 200, JSON.stringify(await route(body, url)), "application/json");
     }
     if (url.pathname === "/healthz") return send(res, 200, "ok");
+    if (url.pathname === "/api/logo" && req.method === "GET") return sendLogo(res, url.searchParams.get("u"));
     if (req.method !== "GET") return send(res, 405, "method not allowed");
     const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     if (file.includes("..")) return send(res, 400, "bad path");
@@ -126,6 +127,32 @@ createServer(async (req, res) => {
 }).listen(PORT, HOST, () => {
   console.log(`Kylo on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT} (Web3 API keys ${hasKeys() ? "set" : "MISSING"}, agent ${AGENT || "off"})`);
 });
+
+// Stock logos live on Binance's image host, which some countries' ISPs block
+// (Nigeria, for one). Kylo's server fetches them instead, from that one host only.
+const LOGO_HOSTS = new Set(["onchainos.bnbstatic.com", "bin.bnbstatic.com", "public.bnbstatic.com"]);
+const LOGO_MAX_BYTES = 512 * 1024;
+const logoCache = new Map(); // url → { type, body }, oldest first
+async function sendLogo(res, raw) {
+  let u;
+  try { u = new URL(String(raw ?? "")); } catch { return send(res, 400, "bad logo url"); }
+  if (u.protocol !== "https:" || !LOGO_HOSTS.has(u.hostname)) return send(res, 400, "logo host not allowed");
+  const key = u.href;
+  let hit = logoCache.get(key);
+  if (!hit) {
+    const r = await fetch(key, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+    const type = r?.headers.get("content-type") ?? "";
+    if (!r?.ok || !/^image\/(png|jpe?g|gif|webp|svg\+xml)\b/.test(type)) return send(res, 404, "no logo");
+    const body = Buffer.from(await r.arrayBuffer());
+    if (body.length > LOGO_MAX_BYTES) return send(res, 404, "logo too big");
+    hit = { type, body };
+    logoCache.set(key, hit);
+    if (logoCache.size > 600) logoCache.delete(logoCache.keys().next().value);
+  }
+  res.writeHead(200, { "Content-Type": hit.type, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff",
+    ...(hit.type.includes("svg") ? { "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'" } : {}) });
+  res.end(hit.body);
+}
 
 function httpError(status, message) {
   return Object.assign(new Error(message), { status });
