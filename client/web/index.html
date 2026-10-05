@@ -142,7 +142,7 @@
     <h1>Kylo<span>.</span></h1>
     <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
-  <p class="lead">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's take, add the ones you like, and buy them all in one tap.</p>
+  <p class="lead">Every tokenized US stock on BNB Chain. Search, open any stock to see Kylo's note, add the ones you like, and buy them all in one tap.</p>
 
   <div class="toolbar">
     <div class="search">
@@ -162,7 +162,7 @@
   <div class="list" id="list">
     <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
   </div>
-  <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's take is built from that live data and simple, visible rules. It isn't investment advice, and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet, and you can say no to any of them.</p>
+  <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's note is built from that live data and simple, visible rules. It isn't investment advice, and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet, and you can say no to any of them.</p>
 </main>
 
 <div class="tray" id="tray"><div class="tray-in">
@@ -272,7 +272,7 @@ function render() {
         <span class="pill ${t.status.tone}">${esc(t.status.label)}</span>
         ${t.assetType === "ETF" ? `<span class="pill">ETF</span>` : ""}
         ${t.sectors.slice(0, 2).map((id) => `<span class="pill">${esc(config.sectors.find((s) => s.id === id)?.label ?? id)}</span>`).join("")}
-        <span class="more">${open === t.ticker ? "Hide Kylo's take ▲" : "Kylo's take ▼"}</span>
+        <span class="more">${open === t.ticker ? "Hide Kylo's note ▲" : "Kylo's note ▼"}</span>
       </div>
       ${open === t.ticker ? `<div class="insight" id="ins">${insightHtml(t.ticker)}</div>` : ""}
     </div>`).join("");
@@ -331,8 +331,8 @@ function insightHtml(tk) {
     </div>
     ${i.token.length ? `<div class="cols tok" style="margin-top:10px"><div><h4>About holding the token</h4>${li(i.token)}</div></div>` : ""}
     ${config.agent ? `<div class="deeper">
-      ${deeper?.take ? deeperHtml(deeper.take) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written take? Kylo's AI agent reads the same live data and explains it in plain English.</p>`}
-      ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a written take"}</button>`}
+      ${deeper?.take ? deeperHtml(deeper.take) : deeper?.error ? `<p class="err">${esc(deeper.error)}</p>` : `<p>Want Kylo's written note? Kylo's AI agent reads the same live data and explains it in plain English.</p>`}
+      ${deeper?.take ? "" : `<button class="btn" data-deeper ${deeper === "loading" ? "disabled" : ""}>${deeper === "loading" ? "Asking Kylo…" : "Ask Kylo for a written note"}</button>`}
     </div>` : ""}
     <div class="foot">
       <span>${esc(d.symbol)} · <a href="https://bscscan.com/token/${esc(d.contractAddress)}" target="_blank" rel="noopener">contract ↗</a></span>
@@ -341,7 +341,7 @@ function insightHtml(tk) {
     </div>`;
 }
 function deeperHtml(take) {
-  return `<p><b>Kylo's take</b></p>
+  return `<p><b>Kylo's note</b></p>
     ${take.summary ? `<p>${esc(take.summary)}</p>` : ""}
     <div class="cols"><div class="yes">${li(take.reasonsToConsider ?? [])}</div><div class="no">${li(take.reasonsToHoldOff ?? [])}</div></div>
     ${take.tokenNotes?.length ? `<div class="tok" style="margin-top:6px">${li(take.tokenNotes)}</div>` : ""}
