@@ -141,17 +141,27 @@ async function sendLogo(res, raw) {
   let hit = logoCache.get(key);
   if (!hit) {
     const r = await fetch(key, { signal: AbortSignal.timeout(8000) }).catch(() => null);
-    const type = r?.headers.get("content-type") ?? "";
-    if (!r?.ok || !/^image\/(png|jpe?g|gif|webp|svg\+xml)\b/.test(type)) return send(res, 404, "no logo");
+    if (!r?.ok) return send(res, 404, "no logo");
     const body = Buffer.from(await r.arrayBuffer());
     if (body.length > LOGO_MAX_BYTES) return send(res, 404, "logo too big");
+    // Some logos come back as application/octet-stream, so trust the file's own bytes.
+    const type = imageType(body);
+    if (!type) return send(res, 404, "no logo");
     hit = { type, body };
     logoCache.set(key, hit);
     if (logoCache.size > 600) logoCache.delete(logoCache.keys().next().value);
   }
-  res.writeHead(200, { "Content-Type": hit.type, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff",
-    ...(hit.type.includes("svg") ? { "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'" } : {}) });
+  res.writeHead(200, { "Content-Type": hit.type, "Cache-Control": "public, max-age=604800, immutable", "X-Content-Type-Options": "nosniff" });
   res.end(hit.body);
+}
+
+function imageType(b) {
+  if (b.length < 12) return null;
+  if (b[0] === 0x89 && b.toString("latin1", 1, 4) === "PNG") return "image/png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b.toString("latin1", 0, 4) === "GIF8") return "image/gif";
+  if (b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") return "image/webp";
+  return null;
 }
 
 function httpError(status, message) {
