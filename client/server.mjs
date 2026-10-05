@@ -162,10 +162,18 @@ async function sendDoc(res, raw) {
   let u;
   try { u = new URL(String(raw ?? "")); } catch { return send(res, 400, "bad document url"); }
   if (u.protocol !== "https:" || !LOGO_HOSTS.has(u.hostname) || !/\.pdf$/i.test(u.pathname)) return send(res, 400, "document not allowed");
-  const r = await fetch(u.href, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
-  if (!r?.ok) return send(res, 404, "Binance didn't return this report. Try again later.");
+  let err = null;
+  const r = await fetch(u.href, { signal: AbortSignal.timeout(20_000),
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; Kylo/1.0)", Referer: "https://web3.binance.com/", Accept: "application/pdf,*/*" } })
+    .catch((e) => { err = e; return null; });
+  if (!r?.ok) {
+    console.warn("doc fetch failed", u.pathname, r?.status ?? String(err?.cause?.code ?? err?.message ?? err));
+    return send(res, 404, `Binance didn't return this report (${r ? `HTTP ${r.status}` : "no connection"}). Try again later.`);
+  }
   const body = Buffer.from(await r.arrayBuffer());
-  if (body.length > DOC_MAX_BYTES || body.toString("latin1", 0, 5) !== "%PDF-") return send(res, 404, "this report isn't a PDF");
+  if (body.length > DOC_MAX_BYTES || body.toString("latin1", 0, 5) !== "%PDF-") {
+    return send(res, 404, `this report isn't a PDF (${r.headers.get("content-type") ?? "unknown type"}, ${body.length} bytes)`);
+  }
   const name = u.pathname.split("/").pop().replace(/[^\w.-]/g, "");
   res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${name}"`,
     "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff" });
