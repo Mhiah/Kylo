@@ -30,11 +30,10 @@ Kylo lists every Ondo tokenized US stock and ETF on BNB Chain, explains each one
 6. [Kylo's note](#kylos-note)
 7. [The Kylo agent (BNB Agent Studio)](#the-kylo-agent-bnb-agent-studio)
 8. [Safety](#safety)
-9. [Built from Nigeria](#built-from-nigeria)
-10. [Run it yourself](#run-it-yourself)
-11. [Project layout](#project-layout)
-12. [Known limits](#known-limits)
-13. [Developer experience notes](#developer-experience-notes)
+9. [Run it yourself](#run-it-yourself)
+10. [Project layout](#project-layout)
+11. [Known limits](#known-limits)
+12. [Developer experience notes](#developer-experience-notes)
 
 ---
 
@@ -159,14 +158,6 @@ When the Kylo agent is connected, an extra **"Ask Kylo for a written note"** but
 - **Paused stocks are blocked,** and earnings-week stocks need an explicit opt-in.
 - **Narrow proxies.** `/api/logo` fetches only images, only from Binance's image hosts, and checks each file's real type before passing it on.
 - **Not investment advice.** The notes describe live data with visible rules. Every decision is yours.
-
-## Built from Nigeria
-
-Kylo was built from Nigeria, where internet providers block `binance.com` and Binance's other domains, including `web3.binance.com` and the `bnbstatic.com` image host. That shaped the design:
-
-- **The web server runs in Singapore** (Render), so every Binance Web3 API call happens server-side from an allowed region. The browser only talks to Kylo and to BSC.
-- **Stock logos go through Kylo's server,** because the browser can't load them from Binance's blocked image host.
-- **No VPN workarounds.** Binance's Agentic Wallet signs in only through binance.com, which is blocked here, and Binance's terms forbid getting around country blocks. Kylo therefore uses the user's own browser wallet instead.
 
 ## Run it yourself
 
