@@ -4,7 +4,7 @@
 
 Kylo lists every Ondo tokenized US stock and ETF on BNB Chain, explains each one in plain English, and turns a theme like *AI chips* or *Magnificent 7* into a basket you can buy with USDT in a few taps. Kylo never holds your money or your keys: every order is confirmed in your own wallet.
 
-- **Live app:** https://kylo.onrender.com
+- **Live app:** https://kylo.myacxt.site
 - **Built for:** [BNB Hack: Tokenized Stocks Edition](https://www.bnbchain.org/en/hackathons/tokenized-stocks) (main track, plus *Best Use of BNB Agent Studio*)
 - **Built on:** the official [Binance Web3 API](https://web3.binance.com/en/dev-docs) (RWA Data, General Data, Trading, Transaction), Ondo tokenized stocks on BSC mainnet, and [BNB Agent Studio](https://www.bnbchain.org/en/bnb-agent-studio)
 
@@ -51,7 +51,7 @@ Most people don't think in tickers. They think "I want some AI chip makers" or "
 
 1. **Browse every tokenized stock.** All Ondo stocks and ETFs on BSC (439 at the last live check), with live price, 24h change, trading status (`Open`, `Open · postmarket`, `Paused · stock split`, `Earnings`…) and logo. Search by company, ticker or theme. Sort by size, top gainers, top losers or A–Z.
 2. **Pick a theme.** 11 themes: AI chips, Magnificent 7, Tech leaders, Energy, Buffett picks, Crypto stocks, ETFs, Precious metals, Storage, Space and China ADRs. The page says whether a theme's list came from Binance or from Kylo (see [Known limits](#known-limits)).
-3. **Read Kylo's note.** Tap *Kylo's note →* on any stock to open its own page (shareable, e.g. `kylo.onrender.com/#/stock/NVDA`) with a 90-day chart, key numbers and the note.
+3. **Read Kylo's note.** Tap *Kylo's note →* on any stock to open its own page (shareable, e.g. `kylo.myacxt.site/#/stock/NVDA`) with a 90-day chart, key numbers and the note.
 4. **Build a basket.** Add stocks one by one or a whole theme. Choose $25, $50, $100 or your own amount. Close the basket with × and reopen it from the yellow *Basket* button.
 5. **Plan and buy.** *Plan basket* shows each stock, its amount, the live quote and your USDT balance. Stocks that can't be bought right now are left out with the reason. *Buy basket* walks your wallet through the approval and one confirmation per stock, then shows a receipt with BscScan links.
 
