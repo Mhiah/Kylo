@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractNote, parseInsightRequest } from "../src/unifiedMain.js";
+import { extractNote, jobTask, parseInsightRequest } from "../src/unifiedMain.js";
 
 test("insight request without facts", () => {
   assert.deepEqual(parseInsightRequest('{"action":"insight","ticker":"nvda"}'), { ticker: "NVDA" });
@@ -23,4 +23,15 @@ test("note JSON is found after a free model's thinking text", () => {
   assert.deepEqual(extractNote(raw), note);
   assert.deepEqual(extractNote("```json\n" + JSON.stringify(note) + "\n```"), note);
   assert.equal(extractNote("Thinking Process: no JSON at all"), null);
+});
+
+test("jobTask unwraps a paid ERC-8183 job prompt to the buyer's task", () => {
+  const task = '{"action":"insight","ticker":"NVDA"}';
+  const wrapped = "You accepted and were paid for the following job. Produce the deliverable now.\n\nJOB CONTEXT:\n" +
+    JSON.stringify({ task, terms: { price: "0.05" } });
+  assert.equal(jobTask(wrapped), task);
+  assert.deepEqual(parseInsightRequest(jobTask(wrapped)!), { ticker: "NVDA" });
+  assert.equal(jobTask(wrapped.replace(JSON.stringify(task), JSON.stringify({ action: "insight", ticker: "KO" }))), '{"action":"insight","ticker":"KO"}');
+  assert.equal(jobTask('{"action":"insight","ticker":"NVDA"}'), null);
+  assert.equal(jobTask("JOB CONTEXT:\njob 7"), null);
 });

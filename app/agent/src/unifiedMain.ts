@@ -200,9 +200,12 @@ export function buildRunWork(): RunWork {
   return async (prompt, { abortSignal }) => {
     // Structured requests ({"theme":"ai","usd":50}) skip the LLM entirely:
     // the plan is deterministic code, so it's cheaper and can't hallucinate.
-    const structured = parseBasketRequest(prompt);
+    // A paid ERC-8183 job arrives wrapped by sellerCore ("JOB CONTEXT: {task, terms}"),
+    // so the structured request is the job's task, not the whole prompt.
+    const request = jobTask(prompt) ?? prompt;
+    const structured = parseBasketRequest(request);
     if (structured) return JSON.stringify(await planBasket(structured));
-    const insight = parseInsightRequest(prompt);
+    const insight = parseInsightRequest(request);
     model ??= buildModel(); // managed model with the auto-renew hook (delivery only)
     if (insight) return deeperTake(model, insight.ticker, insight.facts, abortSignal);
 
@@ -233,6 +236,23 @@ export function buildRunWork(): RunWork {
     });
     return result.text.trim();
   };
+}
+
+/**
+ * The buyer's task from a paid ERC-8183 job prompt (`JOB CONTEXT:\n{"task":…,"terms":…}`),
+ * as a string, or null when the prompt isn't a job wrapper.
+ */
+export function jobTask(prompt: string): string | null {
+  const at = prompt.lastIndexOf("JOB CONTEXT:");
+  if (at < 0) return null;
+  try {
+    const v = JSON.parse(prompt.slice(at + "JOB CONTEXT:".length)) as { task?: unknown };
+    if (typeof v?.task === "string") return v.task;
+    if (v?.task && typeof v.task === "object") return JSON.stringify(v.task);
+  } catch {
+    // not a job wrapper
+  }
+  return null;
 }
 
 /**
