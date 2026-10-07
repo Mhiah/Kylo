@@ -130,8 +130,8 @@ createServer(async (req, res) => {
   console.log(`Kylo on http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT} (Web3 API keys ${hasKeys() ? "set" : "MISSING"}, agent ${AGENT || "off"})`);
 });
 
-// Stock logos live on Binance's image host, which some countries' ISPs block
-// (Nigeria, for one). Kylo's server fetches them instead, from that one host only.
+// Stock logos live on Binance's image host, which some ISPs block.
+// Kylo's server fetches them instead, from Binance's image hosts only.
 const LOGO_HOSTS = new Set(["onchainos.bnbstatic.com", "bin.bnbstatic.com", "public.bnbstatic.com"]);
 const LOGO_MAX_BYTES = 512 * 1024;
 const logoCache = new Map(); // url → { type, body }, oldest first
