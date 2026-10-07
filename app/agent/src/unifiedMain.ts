@@ -302,7 +302,10 @@ async function deeperTake(
       'balanced sentence"}. 2-4 items per list, each under 20 words. Write ' +
       "numbers as digits ($241, 29.3, 0.12%), never in words. The token gives " +
       "economic exposure to the share through Ondo; it is NOT direct ownership " +
-      "of the company and has no voting rights, so never say otherwise. Skip " +
+      "of the company and has no voting rights, so never say otherwise; a token " +
+      "tracks a share, it never owns or controls one. Name each number's period " +
+      "exactly as the data labels it (a 52-week high is a 52-week high, never a " +
+      "multi-year high). Don't mention Kylo, Binance or how to trade. Skip " +
       "filler: every item must say something specific about this stock. No " +
       "price targets, no instructions to buy or sell.",
     prompt: JSON.stringify(snapshot),
