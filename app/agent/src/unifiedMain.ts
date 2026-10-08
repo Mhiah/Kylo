@@ -322,11 +322,12 @@ async function deeperTake(
  * thinking ("Thinking Process: ...", or <think>...</think>) before the JSON,
  * so take the last balanced {...} block that parses and has a summary.
  */
-/** House style for every string in a note: no em or en dashes, no comma before "and". */
+/** House style for every string in a note: no dashes in sentences, no comma before "and". A dash between two numbers is a range and stays. */
 export function tidy(text: string): string {
   return text
-    .replace(/(\d)\s*[–—]\s*(?=[$\d])/g, "$1 to ")
+    .replace(/(\d%?)\s*[–—]\s*(?=[$\d])/g, "$1\u0000")
     .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/\u0000/g, "–")
     .replace(/,\s+and\b/g, " and")
     .replace(/,\s*([,.;:])/g, "$1")
     .trim();

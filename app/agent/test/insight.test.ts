@@ -38,7 +38,7 @@ test("jobTask unwraps a paid ERC-8183 job prompt to the buyer's task", () => {
 
 test("tidy removes dashes and commas before and", () => {
   assert.equal(tidy("Strong sales — but pricey, and volatile."), "Strong sales, but pricey and volatile.");
-  assert.equal(tidy("Range $150–$241 in 2024—2025"), "Range $150 to $241 in 2024 to 2025");
+  assert.equal(tidy("Range $150–$241 in 2024—2025"), "Range $150–$241 in 2024–2025");
   assert.equal(tidy("Chips, cloud, and AI"), "Chips, cloud and AI");
   assert.deepEqual(tidyNote({ summary: "A — b", reasonsToConsider: ["x, and y"], n: 3 }), { summary: "A, b", reasonsToConsider: ["x and y"], n: 3 });
 });

@@ -197,7 +197,7 @@
   <div class="list" id="list">
     <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
   </div>
-  <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's note is built from that live data and simple, visible rules. It isn't investment advice and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet and you can say no to any of them.</p>
+  <p class="disclaimer">Prices, sectors and orders come from the official Binance Web3 API. Kylo's note is built from that live data and simple, visible rules. It isn't investment advice, and every decision is yours. Kylo never holds your keys: every order is signed in your own wallet, and you can say no to any of them.</p>
   </div>
   <section id="page" hidden></section>
 </main>
@@ -408,7 +408,7 @@ function insightHtml(tk) {
     ${sparkline(d.closes90d)}
     <div class="stats">
       <div class="stat"><small>Price / share</small><b>${money(d.sharePrice)}</b></div>
-      <div class="stat"><small>52-week range</small><b>${money(d.low52w, 0)} to ${money(d.high52w, 0)}</b>${pos != null ? `<div class="range"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
+      <div class="stat"><small>52-week range</small><b>${money(d.low52w, 0)} – ${money(d.high52w, 0)}</b>${pos != null ? `<div class="range"><i style="left:${(pos * 100).toFixed(0)}%"></i></div>` : ""}</div>
       <div class="stat"><small>P/E</small><b>${d.pe != null ? d.pe.toFixed(1) : "–"}</b></div>
       <div class="stat"><small>Dividend</small><b>${d.dividendYieldPct != null ? d.dividendYieldPct.toFixed(2) + "%" : "–"}</b></div>
       <div class="stat"><small>Company size</small><b>${big(d.stockMarketCap)}</b></div>
