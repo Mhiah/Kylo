@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractNote, jobTask, parseInsightRequest } from "../src/unifiedMain.js";
+import { extractNote, jobTask, parseInsightRequest, tidy, tidyNote } from "../src/unifiedMain.js";
 
 test("insight request without facts", () => {
   assert.deepEqual(parseInsightRequest('{"action":"insight","ticker":"nvda"}'), { ticker: "NVDA" });
@@ -34,4 +34,11 @@ test("jobTask unwraps a paid ERC-8183 job prompt to the buyer's task", () => {
   assert.equal(jobTask(wrapped.replace(JSON.stringify(task), JSON.stringify({ action: "insight", ticker: "KO" }))), '{"action":"insight","ticker":"KO"}');
   assert.equal(jobTask('{"action":"insight","ticker":"NVDA"}'), null);
   assert.equal(jobTask("JOB CONTEXT:\njob 7"), null);
+});
+
+test("tidy removes dashes and commas before and", () => {
+  assert.equal(tidy("Strong sales — but pricey, and volatile."), "Strong sales, but pricey and volatile.");
+  assert.equal(tidy("Range $150–$241 in 2024—2025"), "Range $150 to $241 in 2024 to 2025");
+  assert.equal(tidy("Chips, cloud, and AI"), "Chips, cloud and AI");
+  assert.deepEqual(tidyNote({ summary: "A — b", reasonsToConsider: ["x, and y"], n: 3 }), { summary: "A, b", reasonsToConsider: ["x and y"], n: 3 });
 });

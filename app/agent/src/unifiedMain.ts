@@ -305,14 +305,15 @@ async function deeperTake(
       "of the company and has no voting rights, so never say otherwise; a token " +
       "tracks a share, it never owns or controls one. Name each number's period " +
       "exactly as the data labels it (a 52-week high is a 52-week high, never a " +
-      "multi-year high). Don't mention Kylo, Binance or how to trade. Skip " +
+      "multi-year high). Don't mention Kylo, Binance or how to trade. Never use " +
+      "dashes (— or –) and never put a comma before \"and\". Skip " +
       "filler: every item must say something specific about this stock. No " +
       "price targets, no instructions to buy or sell.",
     prompt: JSON.stringify(snapshot),
     abortSignal,
   });
   const note = extractNote(result.text);
-  if (note) return JSON.stringify({ ticker, ...note });
+  if (note) return JSON.stringify({ ticker, ...tidyNote(note) });
   return JSON.stringify({ ticker, error: "Kylo couldn't write a note this time. Please try again." });
 }
 
@@ -321,6 +322,20 @@ async function deeperTake(
  * thinking ("Thinking Process: ...", or <think>...</think>) before the JSON,
  * so take the last balanced {...} block that parses and has a summary.
  */
+/** House style for every string in a note: no em or en dashes, no comma before "and". */
+export function tidy(text: string): string {
+  return text
+    .replace(/(\d)\s*[–—]\s*(?=[$\d])/g, "$1 to ")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/,\s+and\b/g, " and")
+    .replace(/,\s*([,.;:])/g, "$1")
+    .trim();
+}
+export function tidyNote(note: Record<string, unknown>): Record<string, unknown> {
+  const fix = (v: unknown): unknown => typeof v === "string" ? tidy(v) : Array.isArray(v) ? v.map(fix) : v;
+  return Object.fromEntries(Object.entries(note).map(([k, v]) => [k, fix(v)]));
+}
+
 export function extractNote(raw: string): Record<string, unknown> | null {
   const text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "");
   const blocks: string[] = [];
