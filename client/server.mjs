@@ -14,6 +14,8 @@
  *   POST /api/leg    {planId, index}    → one order to sign (+ approval if needed)
  *   POST /api/submit {planId, index, signature} → hand a signed order to Binance
  *   GET  /api/order?id=…                → order settlement status
+ *   GET  /api/holdings?wallet=0x…       → the stock tokens a wallet holds
+ *   POST /api/sell   {ticker, wallet}   → sell a whole holding back to USDT (order to sign)
  *
  *   KYLO_W3_API_KEY=… KYLO_W3_API_SECRET=… node client/server.mjs   # http://localhost:4402
  */
@@ -23,7 +25,7 @@ import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { marketStatus, sectorsInfo, tokenDetail, tokenList } from "./data.mjs";
-import { isAddress, orderStatus, planBasket, prepareLeg, quoteLegs, submitLeg, usdtBalance, formatUnits } from "./trade.mjs";
+import { holdings, isAddress, orderStatus, planBasket, prepareLeg, prepareSell, quoteLegs, submitLeg, usdtBalance, formatUnits } from "./trade.mjs";
 import { hasKeys } from "./web3api.mjs";
 
 const PORT = Number(process.env.PORT ?? 4402);
@@ -90,6 +92,19 @@ const routes = {
     return r;
   },
   "GET /api/order": async (_b, url) => orderStatus(url.searchParams.get("id") ?? ""),
+  "GET /api/holdings": async (_b, url) => {
+    const wallet = url.searchParams.get("wallet");
+    if (!isAddress(wallet)) throw httpError(400, "connect a wallet first");
+    return { wallet, holdings: await holdings(wallet) };
+  },
+  "POST /api/sell": async (body) => {
+    if (!isAddress(body.wallet)) throw httpError(400, "connect a wallet first");
+    const { leg, prepared } = await prepareSell(body.ticker, body.wallet, body.slippagePercent);
+    // A one-leg "plan", so a signed sell order goes through the same /api/submit.
+    const planId = randomUUID();
+    plans.set(planId, { plan: { legs: [leg] }, wallet: body.wallet, at: Date.now(), legs: [{ requestId: randomUUID(), prepared, orderId: null }] });
+    return { planId, index: 0, ...prepared };
+  },
 };
 
 async function askAgent(promptObj) {

@@ -113,14 +113,15 @@ export async function planBasket({ theme, tickers, usd, maxLegs, allowEarnings =
   };
 }
 
-/** Best route for one leg; RFQ routes (Ondo) need the buyer's wallet address. */
-async function bestQuote(leg, wallet) {
-  const routes = await quote({ from: USDT_BSC, to: leg.contractAddress, amount: usdToUnits(leg.usd), wallet });
+/** Best route for one swap; RFQ routes (Ondo) need the trader's wallet address. */
+async function bestRoute({ from, to, amount, wallet }) {
+  const routes = await quote({ from, to, amount, wallet });
   const list = Array.isArray(routes) ? routes : [];
   const best = list.find((r) => r.isBest) ?? list[0];
   if (!best) throw new Error("no route");
   return best;
 }
+const bestQuote = (leg, wallet) => bestRoute({ from: USDT_BSC, to: leg.contractAddress, amount: usdToUnits(leg.usd), wallet });
 
 export async function quoteLegs(plan, wallet) {
   // One at a time: the API rate-limits bursts of quotes.
@@ -161,23 +162,58 @@ async function rpc(method, params) {
 const pad = (a) => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 
 export async function usdtBalance(wallet) {
-  return BigInt(await rpc("eth_call", [{ to: USDT_BSC, data: `0x70a08231${pad(wallet)}` }, "latest"]));
+  return tokenBalance(USDT_BSC, wallet);
 }
-async function allowance(owner, spender) {
-  return BigInt(await rpc("eth_call", [{ to: USDT_BSC, data: `0xdd62ed3e${pad(owner)}${pad(spender)}` }, "latest"]));
+async function tokenBalance(token, wallet) {
+  return BigInt(await rpc("eth_call", [{ to: token, data: `0x70a08231${pad(wallet)}` }, "latest"]));
+}
+async function allowance(token, owner, spender) {
+  return BigInt(await rpc("eth_call", [{ to: token, data: `0xdd62ed3e${pad(owner)}${pad(spender)}` }, "latest"]));
+}
+
+/** balanceOf for many tokens, as JSON-RPC batches (one request per 100 tokens). */
+async function balancesOf(tokens, wallet) {
+  const out = new Map();
+  for (let i = 0; i < tokens.length; i += 100) {
+    const chunk = tokens.slice(i, i + 100);
+    const res = await fetch(RPC, {
+      method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(15_000),
+      body: JSON.stringify(chunk.map((t, j) => ({ jsonrpc: "2.0", id: i + j, method: "eth_call", params: [{ to: t, data: `0x70a08231${pad(wallet)}` }, "latest"] }))),
+    });
+    const list = await res.json().catch(() => null);
+    if (!Array.isArray(list)) throw new Error("couldn't read your wallet's balances from BNB Chain; try again");
+    for (const r of list) {
+      if (r?.result && r.result !== "0x") out.set(tokens[r.id].toLowerCase(), BigInt(r.result));
+    }
+  }
+  return out;
+}
+
+/** The tokenized stocks this wallet holds, with a rough USD value from the live token price. */
+export async function holdings(wallet) {
+  const all = await tokenList();
+  const bal = await balancesOf(all.map((t) => t.contractAddress), wallet);
+  return all
+    .map((t) => {
+      const units = bal.get(t.contractAddress.toLowerCase()) ?? 0n;
+      if (units === 0n) return null;
+      const amount = formatUnits(units, t.decimals, 6);
+      return { ticker: t.ticker, symbol: t.symbol, name: t.name, icon: t.icon, contractAddress: t.contractAddress, decimals: t.decimals,
+        amount, usd: t.tokenPrice != null ? Math.round(Number(amount) * t.tokenPrice * 100) / 100 : null };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0));
 }
 
 /**
- * Build one leg for the browser wallet: a fresh quote (they live ~30s), the
- * order, and an approval only if the current allowance is too low. Any
- * approval is simulated first so the user sees what it will do.
+ * Build one swap for the browser wallet: a fresh quote (they live ~30s), the
+ * order, and an approval of the token being paid only if the current
+ * allowance is too low. Any approval is simulated first so the user sees what
+ * it will do. Buying pays USDT for a stock; selling pays the stock for USDT.
  */
-export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd = leg.usd) {
-  const amount = usdToUnits(leg.usd);
-  // Approve the rest of the basket at once, so it is one approval, not one per stock.
-  const approveAmount = usdToUnits(Math.max(approveUsd, leg.usd));
-  const route = await bestQuote(leg, wallet);
-  const built = await buildSwap({ from: USDT_BSC, to: leg.contractAddress, amount, wallet, quoteId: route.quoteId, slippagePercent });
+async function prepareSwap({ ticker, from, fromDecimals, to, toDecimals, amount, approveAmount, wallet, slippagePercent = "1" }) {
+  const route = await bestRoute({ from, to, amount, wallet });
+  const built = await buildSwap({ from, to, amount, wallet, quoteId: route.quoteId, slippagePercent });
   const mode = built.executionMode ?? route.executionMode;
 
   let spender = null, approveData = null;
@@ -187,7 +223,7 @@ export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd 
     approveData = extra?.approveTxCalldata ?? null;
     // The vendor-specific approval endpoint lets us approve the whole basket;
     // the calldata bundled with the order only covers this one stock.
-    const a = (await approveTx({ token: USDT_BSC, amount: approveAmount, vendor: built.rfq?.vendor ?? route.vendorName }).catch(() => null))?.[0];
+    const a = (await approveTx({ token: from, amount: approveAmount, vendor: built.rfq?.vendor ?? route.vendorName }).catch(() => null))?.[0];
     if (a?.dexContractAddress && a?.data && (!spender || a.dexContractAddress.toLowerCase() === spender.toLowerCase())) {
       spender = a.dexContractAddress;
       approveData = a.data;
@@ -196,7 +232,7 @@ export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd 
     // DEX route: the router to approve is in tx.signatureData[0] or the quote's
     // approveTarget; the approve endpoint also names it, so fall back to that.
     spender = [built.tx?.signatureData?.[0], route.approveTarget].find(isAddress) ?? null;
-    const a = (await approveTx({ token: USDT_BSC, amount: approveAmount }))?.[0];
+    const a = (await approveTx({ token: from, amount: approveAmount }))?.[0];
     if (a?.data && (!spender || !isAddress(a.dexContractAddress) || a.dexContractAddress.toLowerCase() === spender.toLowerCase())) {
       spender = spender ?? a.dexContractAddress;
       approveData = a.data;
@@ -205,16 +241,16 @@ export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd 
   }
 
   let approve = null;
-  const current = spender ? await allowance(wallet, spender).catch(() => 0n) : 0n;
+  const current = spender ? await allowance(from, wallet, spender).catch(() => 0n) : 0n;
   if (spender && approveData && current < BigInt(amount)) {
-    const sim = await simulate({ from: wallet, to: USDT_BSC, data: approveData }).catch((e) => ({ status: "UNKNOWN", failReason: String(e.message ?? e) }));
-    approve = { to: USDT_BSC, data: approveData, spender, simulation: { status: sim?.status ?? null, failReason: sim?.failReason ?? null } };
+    const sim = await simulate({ from: wallet, to: from, data: approveData }).catch((e) => ({ status: "UNKNOWN", failReason: String(e.message ?? e) }));
+    approve = { to: from, data: approveData, spender, simulation: { status: sim?.status ?? null, failReason: sim?.failReason ?? null } };
   }
 
   const out = {
-    ticker: leg.ticker, mode, vendor: built.rfq?.vendor ?? built.routerResult?.vendorName ?? route.vendorName, approve,
-    allowance: spender ? { spender, current: formatUnits(current, USDT_DECIMALS, 2), needed: formatUnits(amount, USDT_DECIMALS, 2) } : null,
-    receive: formatUnits(built.routerResult?.toTokenAmount ?? route.toTokenAmount, leg.decimals, 6),
+    ticker, mode, vendor: built.rfq?.vendor ?? built.routerResult?.vendorName ?? route.vendorName, approve,
+    allowance: spender ? { spender, current: formatUnits(current, fromDecimals, 2), needed: formatUnits(amount, fromDecimals, 2) } : null,
+    receive: formatUnits(built.routerResult?.toTokenAmount ?? route.toTokenAmount, toDecimals, 6),
   };
   if (mode === "RFQ") {
     out.rfq = { typedData: decodeTypedData(built.rfq?.typedDataToSign), vendor: built.rfq?.vendor, orderId: built.rfq?.orderId ?? route.quoteId, signingScheme: built.rfq?.signingScheme ?? null };
@@ -223,6 +259,36 @@ export async function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd 
     out.tx = { from: wallet, to: tx.to, data: tx.data, value: tx.value ?? "0", gas: tx.gas ?? null };
   }
   return out;
+}
+
+/** One basket leg: pay `leg.usd` of USDT for the stock token. */
+export function prepareLeg(leg, wallet, slippagePercent = "1", approveUsd = leg.usd) {
+  return prepareSwap({
+    ticker: leg.ticker, from: USDT_BSC, fromDecimals: USDT_DECIMALS, to: leg.contractAddress, toDecimals: leg.decimals,
+    amount: usdToUnits(leg.usd),
+    // Approve the rest of the basket at once, so it is one approval, not one per stock.
+    approveAmount: usdToUnits(Math.max(approveUsd, leg.usd)),
+    wallet, slippagePercent,
+  });
+}
+
+/**
+ * Sell a wallet's whole holding of one stock token back to USDT. Binance
+ * won't route an order of $5 or less, so tiny holdings are refused up front.
+ */
+export async function prepareSell(ticker, wallet, slippagePercent = "1") {
+  const t = (await tokenList()).find((x) => x.ticker === String(ticker ?? "").toUpperCase());
+  if (!t) throw Object.assign(new Error("unknown stock"), { status: 400 });
+  const units = await tokenBalance(t.contractAddress, wallet);
+  if (units === 0n) throw Object.assign(new Error(`this wallet holds no ${t.symbol}`), { status: 400 });
+  const usd = t.tokenPrice != null ? Number(formatUnits(units, t.decimals, 6)) * t.tokenPrice : null;
+  if (usd != null && usd <= 5) throw Object.assign(new Error(`this holding is worth about ${usd.toFixed(2)} USD, and Binance only routes orders over 5 USD`), { status: 400 });
+  const leg = { ticker: t.ticker, symbol: t.symbol, contractAddress: t.contractAddress, decimals: t.decimals, usd: usd != null ? Math.round(usd * 100) / 100 : null };
+  const prepared = await prepareSwap({
+    ticker: t.ticker, from: t.contractAddress, fromDecimals: t.decimals, to: USDT_BSC, toDecimals: USDT_DECIMALS,
+    amount: units.toString(), approveAmount: units.toString(), wallet, slippagePercent,
+  });
+  return { leg, prepared: { ...prepared, sellAmount: formatUnits(units, t.decimals, 6), symbol: t.symbol } };
 }
 
 export function submitLeg({ requestId, signature, vendor, orderId, signingScheme }) {

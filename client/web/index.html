@@ -173,7 +173,7 @@
 <main>
   <header>
     <a class="mini" href="#" aria-label="Kylo home">Kylo<span>.</span></a>
-    <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill basketpill" id="basketpill" hidden>Basket</button><button class="pill btnpill" id="wallet">Connect wallet</button></div>
+    <div class="pills"><span class="pill" id="market">Market…</span><button class="pill btnpill basketpill" id="basketpill" hidden>Basket</button><button class="pill btnpill" id="mine">My stocks</button><button class="pill btnpill" id="wallet">Connect wallet</button></div>
   </header>
   <div id="home">
   <div class="hero"><h1 aria-label="Kylo"><i style="--n:0">K</i><i style="--n:1">y</i><i style="--n:2">l</i><i style="--n:3">o</i><span>.</span></h1></div>
@@ -523,9 +523,13 @@ async function waitReceipt(hash) {
 }
 
 async function buyLeg(planId, index, onStep) {
-  const leg = await api("/api/leg", { planId, index });
+  return execLeg(planId, index, await api("/api/leg", { planId, index }), onStep, "USDT");
+}
+
+/** Approve (if needed), then sign the RFQ order or send the swap, and wait until it settles. */
+async function execLeg(planId, index, leg, onStep, paying) {
   if (leg.approve) {
-    onStep("Approve USDT in your wallet…");
+    onStep(`Approve ${paying} in your wallet…`);
     const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from: wallet, to: leg.approve.to, data: leg.approve.data }] });
     onStep("Waiting for the approval…");
     await waitReceipt(hash);
@@ -583,6 +587,47 @@ function renderReceipt(p, results) {
     </tbody></table></div>
     <div class="actions"><button class="btn primary" data-close>Done</button></div>`);
 }
+
+// ── my stocks → sell back to USDT ─────────────────────────────────────────
+async function showHoldings() {
+  if (!wallet) await connect();
+  sheet(`<h3>My stocks</h3><p class="sub">Checking your wallet…</p>`);
+  const { holdings } = await api(`/api/holdings?wallet=${encodeURIComponent(wallet)}`);
+  sheet(`
+    <h3>My stocks</h3>
+    <p class="sub">Stock tokens in wallet ${esc(short(wallet))} on BNB Chain · values are estimates from the live token price</p>
+    ${holdings.length ? `<div style="overflow-x:auto"><table><thead><tr><th>Stock</th><th class="num">You hold</th><th class="num">Worth about</th><th></th></tr></thead><tbody>
+      ${holdings.map((h) => `<tr><td><b>${esc(h.ticker)}</b><br><code>${esc(h.symbol)}</code></td><td class="num">${esc(h.amount)}</td><td class="num">${money(h.usd)}</td>
+        <td class="num">${h.usd != null && h.usd <= 5 ? `<span class="sub">too small to sell</span>` : `<button class="btn" data-sell="${esc(h.ticker)}">Sell</button>`}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="sub" style="margin-top:10px">Sell swaps your whole holding of that stock back to USDT. Binance only routes orders over $5.</p>`
+    : `<p>You don't hold any tokenized stocks in this wallet yet.</p>`}
+    <div class="actions"><button class="btn" data-close>Close</button></div>`);
+  document.querySelectorAll("[data-sell]").forEach((b) => b.addEventListener("click", () => sell(b.dataset.sell, holdings.find((h) => h.ticker === b.dataset.sell))));
+}
+
+async function sell(ticker, h) {
+  const r = { ticker, status: "WAITING", step: "Getting a price…" };
+  const draw = () => sheet(`
+    <h3>Selling ${esc(ticker)}</h3>
+    <p class="sub">${esc(h?.amount ?? "")} <code>${esc(h?.symbol ?? "")}</code> → USDT · confirm in your wallet, or reject to cancel</p>
+    <table><tbody><tr><td><b>${esc(ticker)}</b></td><td class="num">${money(h?.usd)}</td><td>${esc(r.step ?? "")}</td></tr></tbody></table>`);
+  draw();
+  try {
+    const leg = await api("/api/sell", { ticker, wallet });
+    r.step = `You get about ${Number(leg.receive).toFixed(2)} USDT`; draw();
+    Object.assign(r, await execLeg(leg.planId, leg.index, leg, (step) => { r.step = step; draw(); }, leg.symbol));
+  } catch (e) {
+    Object.assign(r, { status: "FAILED", error: e.code === 4001 ? "you rejected it in your wallet" : String(e.message ?? e) });
+  }
+  sheet(`
+    <h3>${r.status === "FILLED" ? `Sold ${esc(ticker)} 🎉` : r.status === "PENDING" ? `${esc(ticker)} sale still settling` : `${esc(ticker)} not sold`}</h3>
+    <p class="sub">${r.status === "FILLED" ? `You got about ${esc(Number(r.received).toFixed(2))} USDT` : r.status === "PENDING" ? "Check your wallet in a minute." : esc(r.error ?? "")}</p>
+    ${r.txHash ? `<p><a href="https://bscscan.com/tx/${esc(r.txHash)}" target="_blank" rel="noopener">See it on BscScan ↗</a></p>` : ""}
+    <div class="actions"><button class="btn" id="back">My stocks</button><button class="btn primary" data-close>Done</button></div>`);
+  $("#back").addEventListener("click", () => showHoldings().catch((e) => alert(e.message)));
+}
+$("#mine").addEventListener("click", () => showHoldings().catch((e) => sheet(`<h3>Couldn't load your stocks</h3><p class="err">${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Close</button></div>`)));
 
 // ── boot ──────────────────────────────────────────────────────────────────
 api("/api/config").then((c) => { config = c; renderThemes(); render(); }).catch(() => renderThemes());

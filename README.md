@@ -54,6 +54,7 @@ Most people don't think in tickers. They think "I want some AI chip makers" or "
 3. **Read Kylo's note.** Tap *Kylo's note →* on any stock to open its own page (shareable, e.g. `kylo.myacxt.site/#/stock/NVDA`) with a 90-day chart, key numbers and the note.
 4. **Build a basket.** Add stocks one by one or a whole theme. Choose $25, $50, $100 or your own amount. Close the basket with × and reopen it from the yellow *Basket* button.
 5. **Plan and buy.** *Plan basket* shows each stock, its amount, the live quote and your USDT balance. Stocks that can't be bought right now are left out with the reason. *Buy basket* walks your wallet through the approval and one confirmation per stock, then shows a receipt with BscScan links.
+6. **Sell.** *My stocks* lists the stock tokens in your wallet with a rough USD value. *Sell* swaps a whole holding back to USDT through the same Binance Web3 API route, approved and signed in your wallet (Binance only routes orders over $5).
 
 Works in any browser wallet that injects `window.ethereum` (MetaMask, Trust Wallet, Binance Wallet's browser extension…), on phone and desktop.
 
