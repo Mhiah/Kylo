@@ -171,20 +171,41 @@ async function allowance(token, owner, spender) {
   return BigInt(await rpc("eth_call", [{ to: token, data: `0xdd62ed3e${pad(owner)}${pad(spender)}` }, "latest"]));
 }
 
-/** balanceOf for many tokens, as JSON-RPC batches (one request per 100 tokens). */
+/**
+ * Multicall3, deployed at the same address on BNB Chain. One eth_call reads
+ * many balances, because public BSC nodes rate-limit or reject big JSON-RPC
+ * batches and a batch of per-call errors used to read as "you hold nothing".
+ */
+const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const word = (n) => n.toString(16).padStart(64, "0");
+
+/** balanceOf for many tokens via Multicall3 aggregate3, 150 tokens per call. */
 async function balancesOf(tokens, wallet) {
   const out = new Map();
-  for (let i = 0; i < tokens.length; i += 100) {
-    const chunk = tokens.slice(i, i + 100);
-    const res = await fetch(RPC, {
-      method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify(chunk.map((t, j) => ({ jsonrpc: "2.0", id: i + j, method: "eth_call", params: [{ to: t, data: `0x70a08231${pad(wallet)}` }, "latest"] }))),
+  const callData = `70a08231${pad(wallet)}`; // 36 bytes, padded to 64 below
+  for (let i = 0; i < tokens.length; i += 150) {
+    const chunk = tokens.slice(i, i + 150);
+    // aggregate3((address target, bool allowFailure, bytes callData)[])
+    let head = "", body = "";
+    chunk.forEach((t, j) => {
+      head += word(chunk.length * 32 + j * 192);
+      body += pad(t) + word(1) + word(0x60) + word(36) + callData.padEnd(128, "0");
     });
-    const list = await res.json().catch(() => null);
-    if (!Array.isArray(list)) throw new Error("couldn't read your wallet's balances from BNB Chain; try again");
-    for (const r of list) {
-      if (r?.result && r.result !== "0x") out.set(tokens[r.id].toLowerCase(), BigInt(r.result));
-    }
+    const data = `0x82ad56cb${word(0x20)}${word(chunk.length)}${head}${body}`;
+    let res;
+    try { res = await rpc("eth_call", [{ to: MULTICALL3, data }, "latest"]); }
+    catch { throw new Error("couldn't read your wallet's balances from BNB Chain; try again"); }
+    // returns (bool success, bytes returnData)[]
+    const hex = res.replace(/^0x/, "");
+    const at = (byte) => BigInt(`0x${hex.slice(byte * 2, byte * 2 + 64)}`);
+    const arr = Number(at(0)) + 32; // skip the length word
+    if (Number(at(arr - 32)) !== chunk.length) throw new Error("couldn't read your wallet's balances from BNB Chain; try again");
+    chunk.forEach((t, j) => {
+      const el = arr + Number(at(arr + j * 32));
+      if (at(el) !== 1n || at(el + 64) < 32n) return; // not a token, or the call failed
+      const units = at(el + 96);
+      if (units > 0n) out.set(t.toLowerCase(), units);
+    });
   }
   return out;
 }
