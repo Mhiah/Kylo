@@ -254,11 +254,19 @@ async function connect() {
     if (e.code === 4902) await eth().request({ method: "wallet_addEthereumChain", params: [{ chainId: "0x38", chainName: "BNB Smart Chain", nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 }, rpcUrls: ["https://bsc-dataseed.bnbchain.org"], blockExplorerUrls: ["https://bscscan.com"] }] });
     else throw e;
   }
-  wallet = a; showWallet(); return a;
+  wallet = a; showWallet(); remember(false); return a;
 }
-$("#wallet").addEventListener("click", () => connect().catch((e) => alert(e.message)));
-eth()?.request({ method: "eth_accounts" }).then(([a]) => { if (a) { wallet = a; showWallet(); } }).catch(() => {});
-eth()?.on?.("accountsChanged", ([a]) => { wallet = a ?? null; showWallet(); });
+// Tapping the address disconnects. Kylo remembers that, so a reload doesn't
+// silently reconnect; wallets that support it also drop the site's access.
+const remember = (off) => { try { off ? localStorage.setItem("kylo-off", "1") : localStorage.removeItem("kylo-off"); } catch {} };
+const wasOff = () => { try { return localStorage.getItem("kylo-off") === "1"; } catch { return false; } };
+function disconnect() {
+  wallet = null; showWallet(); remember(true);
+  eth()?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }).catch(() => {});
+}
+$("#wallet").addEventListener("click", () => wallet ? disconnect() : connect().catch((e) => alert(e.message)));
+if (!wasOff()) eth()?.request({ method: "eth_accounts" }).then(([a]) => { if (a) { wallet = a; showWallet(); } }).catch(() => {});
+eth()?.on?.("accountsChanged", ([a]) => { if (!wasOff()) { wallet = a ?? null; showWallet(); } });
 
 // ── themes & search ───────────────────────────────────────────────────────
 function renderThemes() {
