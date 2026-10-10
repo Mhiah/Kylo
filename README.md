@@ -5,6 +5,7 @@
 Kylo lists every Ondo tokenized US stock and ETF on BNB Chain, explains each one in plain English, and turns a theme like *AI chips* or *Magnificent 7* into a basket you can buy with USDT in a few taps. Kylo never holds your money or your keys: every order is confirmed in your own wallet.
 
 - **Live app:** https://kylo.myacxt.site
+- **Demo video (1 min 42 s):** https://youtu.be/ugq6T_2Q2xc
 - **Built for:** [BNB Hack: Tokenized Stocks Edition](https://www.bnbchain.org/en/hackathons/tokenized-stocks) (main track, plus *Best Use of BNB Agent Studio*)
 - **Built on:** the official [Binance Web3 API](https://web3.binance.com/en/dev-docs) (RWA Data, General Data, Trading, Transaction), Ondo tokenized stocks on BSC mainnet, and [BNB Agent Studio](https://www.bnbchain.org/en/bnb-agent-studio)
 
