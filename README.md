@@ -16,7 +16,13 @@ Kylo lists every Ondo tokenized US stock and ETF on BNB Chain, explains each one
 |---|---|---|
 | ![AI chips theme added to the basket](docs/screenshots/theme-basket-phone.png) | ![Basket plan with live quotes and USDT balance](docs/screenshots/plan-phone.png) | ![Receipt with one line per stock and BscScan links](docs/screenshots/receipt-phone.png) |
 
-<sub>Screenshots come from Kylo's offline test setup (a fake Binance Web3 API that checks request signatures), so the prices and company text are sample data. The live app shows real data.</sub>
+<sub>The screenshots above come from Kylo's offline test setup (a fake Binance Web3 API that checks request signatures), so the prices and company text are sample data. The live app shows real data.</sub>
+
+**A real buy on BSC mainnet (live app, 9 Oct 2026):** $6 of NVDA bought through Kylo from the builder's own wallet, then shown in My stocks.
+
+| Basket bought | My stocks |
+|---|---|
+| ![Live receipt: $6.00 spent, NVDA bought 0.026105, with a BscScan proof link](docs/screenshots/live-buy-nvda.png) | ![My stocks on the live app: 0.026104 NVDAon worth about $6.01, with a Sell button](docs/screenshots/live-my-stocks-nvda.png) |
 
 ---
 
@@ -143,6 +149,7 @@ When the Kylo agent is connected, an extra **"Ask Kylo for a written note"** but
 `app/agent/` is a seller agent scaffolded with `bag init` (BNB Agent Studio CLI) and extended for Kylo.
 
 - **Identity:** an ERC-8004 agent identity on BSC testnet, registered when the agent is deployed (`bag deploy verify --provider bnb`).
+- **Deployed:** live on BNB Agent Studio's managed hosting since 10 Oct 2026 as **agent #2585** (ERC-8004 registry `0x8004A818BFB912233c491871b3d84c89A494BD9e` on BSC testnet). Agent card: https://bnbagent-api.bnbchain.world/v1/rt/01M4K5T7AXM7JN3PJ0APEFAPGF/.well-known/agent-card.json
 - **Runtime:** serves the standard Agent Studio surface: an A2A agent card plus JSON-RPC on port 9000, x402, and ERC-8183 job negotiation and delivery.
 - **What it sells:**
   - `{"action":"insight","ticker":"NVDA","facts":{…}}` returns a written note: summary, reasons to consider, reasons to hold off, token notes and a one-line read.
